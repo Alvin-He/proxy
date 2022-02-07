@@ -64,7 +64,22 @@ textarea {
 </div>
 
 <script>
-  var cors_api_url = 'https://cors-anywhere.herokuapp.com/';
+  // if ('serviceWorker' in navigator) {
+  //     // window.addEventListener('load', function () {
+  //     navigator.serviceWorker.register('cros-proxy-service-worker.js').then(function (registration) {
+  //       // Registration was successful
+  //       console.log('ServiceWorker registration successful with scope: ', registration.scope);
+  //       return;
+  //     }, function (err) {
+  //       // registration failed :(
+  //       console.log('ServiceWorker registration failed: ', err);
+  //       return err;
+  //     });
+  //     // });
+  //   }
+
+
+  var cors_api_url = 'http://localhost:8080/';
   function doCORSRequest(options, printResult) {
     var x = new XMLHttpRequest();
     x.open(options.method, cors_api_url + options.url);

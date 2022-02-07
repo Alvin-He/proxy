@@ -31,6 +31,13 @@ function showUsage(help_file, headers, response) {
     });
   }
 }
+
+/**
+ * Check whether the specified hostname is valid.
+ *
+ * @param hostname {string} Host name (excluding port) of requested resource.
+ * @return {boolean} Whether the requested resource can be accessed.
+ */
 function isValidHostName(hostname) {
   return !!(
     regexp_tld.test(hostname) ||
@@ -39,6 +46,12 @@ function isValidHostName(hostname) {
   );
 }
 
+/**
+ * Adds CORS headers to the response headers.
+ *
+ * @param headers {object} Response headers
+ * @param request {ServerRequest}
+ */
 function withCORS(headers, request) {
   headers['access-control-allow-origin'] = '*';
   var corsMaxAge = request.corsAnywhereRequestState.corsMaxAge;
@@ -59,6 +72,13 @@ function withCORS(headers, request) {
   return headers;
 }
 
+/**
+ * Performs the actual proxy request.
+ *
+ * @param req {ServerRequest} Incoming http request
+ * @param res {ServerResponse} Outgoing (proxied) http request
+ * @param proxy {HttpProxy}
+ */
 function proxyRequest(req, res, proxy) {
   var location = req.corsAnywhereRequestState.location;
   req.url = location.path;
@@ -120,6 +140,28 @@ function proxyRequest(req, res, proxy) {
   }
 }
 
+/**
+ * This method modifies the response headers of the proxied response.
+ * If a redirect is detected, the response is not sent to the client,
+ * and a new request is initiated.
+ *
+ * client (req) -> CORS Anywhere -> (proxyReq) -> other server
+ * client (res) <- CORS Anywhere <- (proxyRes) <- other server
+ *
+ * @param proxy {HttpProxy}
+ * @param proxyReq {ClientRequest} The outgoing request to the other server.
+ * @param proxyRes {ServerResponse} The response from the other server.
+ * @param req {IncomingMessage} Incoming HTTP request, augmented with property corsAnywhereRequestState
+ * @param req.corsAnywhereRequestState {object}
+ * @param req.corsAnywhereRequestState.location {object} See parseURL
+ * @param req.corsAnywhereRequestState.getProxyForUrl {function} See proxyRequest
+ * @param req.corsAnywhereRequestState.proxyBaseUrl {string} Base URL of the CORS API endpoint
+ * @param req.corsAnywhereRequestState.maxRedirects {number} Maximum number of redirects
+ * @param req.corsAnywhereRequestState.redirectCount_ {number} Internally used to count redirects
+ * @param res {ServerResponse} Outgoing response to the client that wanted to proxy the HTTP request.
+ *
+ * @returns {boolean} true if http-proxy should continue to pipe proxyRes to res.
+ */
 function onProxyResponse(proxy, proxyReq, proxyRes, req, res) {
   var requestState = req.corsAnywhereRequestState;
 
@@ -188,6 +230,11 @@ function onProxyResponse(proxy, proxyReq, proxyRes, req, res) {
   return true;
 }
 
+
+/**
+ * @param req_url {string} The requested URL (scheme is optional).
+ * @return {object} URL parsed using url.parse
+ */
 function parseURL(req_url) {
   var match = req_url.match(/^(?:(https?:)?\/\/)?(([^\/?]+?)(?::(\d{0,5})(?=[\/?]|$))?)([\/?][\S\s]*|$)/i);
   //                              ^^^^^^^          ^^^^^^^^      ^^^^^^^                ^^^^^^^^^^^^

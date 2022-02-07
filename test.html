@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head id = "CROS-HEAD">
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body id = "CROS-BODY">
+    <script id = "CROS-SCRIPT">
+        if ('serviceWorker' in navigator) {
+                // window.addEventListener('load', function () {
+                navigator.serviceWorker.register('cros-proxy-service-worker.js').then(function (registration) {
+                    // Registration was successful
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    return;
+                }, function (err) {
+                    // registration failed :(
+                    console.log('ServiceWorker registration failed: ', err);
+                    return err;
+                });
+                // });
+            }
+
+        var cors_api_url = 'http://localhost:8080/';
+        var browser = document.getElementById("browser");
+        var head = document.getElementById("CROS-HEAD");
+        var body = document.getElementById("CROS-BODY");
+        var script = document.getElementById("CROS-SCRIPT");
+        function doCORSRequest(url) {
+            var x = new XMLHttpRequest();
+            x.open("GET", cors_api_url + url);
+            x.onload = x.onerror = function () {
+                // browser.innerHTML = x.responseText
+                head.innerHTML = x.responseText.match(/<head>.*<\/head>/gmus)[0].replace(/<\/?head>/g, "");
+                body.innerHTML = x.responseText.match(/<body>.*<\/body>/gmus)[0].replace(/<\/?body>/g, "");
+                body.append(script)
+                console.log(
+                    "GET" + ' ' + url + '\n' +
+                    x.status + ' ' + x.statusText
+                );
+            };
+            navigator.serviceWorker.controller.postMessage({
+                type: "UPDATE_MASTER_URL",
+                data: url
+            });
+            x.send("");
+        }
+
+        doCORSRequest("https://google.com");
+    </script>
+</body>
+</html>
