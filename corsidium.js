@@ -61,10 +61,10 @@ function withCORS(headers, request) {
  * Sends a proxy request
  * 
  * @param {URL} targetURL URL to proxy
- * @param {http.IncomingMessage} req Request sent from the client 
- * @param {http.ServerResponse} res Response that's going to be sent to the client
+ * @param {http.IncomingMessage} clientReq Request sent from the client 
+ * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
-function proxyRequest(targetURL, req, res) {
+function proxyRequest(targetURL, clientReq, clientRes) {
     let options = {
         hostname: targetURL.hostname,
         port: targetURL.port || 80,
@@ -72,34 +72,41 @@ function proxyRequest(targetURL, req, res) {
         mathod: 'GET',
         headers: new Object
     }
-    for (let header in req.headers) {
-        if (req.headers.header) {
+    for (let header in clientReq.headers) {
+        if (clientReq.headers.header) {
             if (header == "host") {
                 options.headers['host'] = targetURL.hostname;
             } else if (header == "referer") {
                 continue
             } else {
-                options.headers[header] = req.headers.header;
+                options.headers[header] = clientReq.headers.header;
             }
-        }
+        }   
     }
 
-    const newReq = http.request(options, (newRes) => {
-        console.log(`STATUS: ${newRes.statusCode}`);
-        console.log(`HEADERS: ${JSON.stringify(newRes.headers)}`);
-        res.writeHead(newRes.statusCode, newRes.headers);
-        newRes.setEncoding('utf8');
-        newRes.on('data', (chunk) => {
-            res.write(chunk)
+    const proxyReq = http.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
+    
+    // proxyReq.end();
+}
+
+function proxyResponse(proxyReq,proxyRes, clientReq, clientRes) {
+    console.log(`STATUS: ${proxyRes.statusCode}`);
+    console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
+
+    const statusCode = proxyRes.statusCode
+    proxyRes.headers = withCORS(proxyRes.headers, clientReq)
+
+        clientRes.writeHead(statusCode, proxyRes.headers);
+        proxyRes.on('data', (chunk) => {
+            clientRes.write(chunk)
             console.log(`BODY: ${chunk}`);
         });
-        newRes.on('end', () => {
+        proxyRes.on('end', () => {
             console.log('No more data in response.');
             res.end()
         });
-    });
-    newReq.end();
 }
+
 
 // Create an HTTP tunneling proxy
 const proxy = http.createServer((req, res) => {
@@ -117,15 +124,15 @@ const proxy = http.createServer((req, res) => {
         
         if (targetURL && targetURL != '/') {
             targetURL = new URL(targetURL)
-            console.log(targetURL)
             if (isValidHostName(targetURL.hostname)) {
-                proxyRequest(targetURL, req, res);
-                // i mean, we could use socket to fetch the response, but i really don't know how to add the CROS headers
-                // const { port, hostname } = new URL(targetURL).;
-                // console.log(port + hostname)
-                // const serverSocket = net.connect(port || 80, hostname, () => {
-                //     serverSocket.pipe(res);
-                // })
+                console.log(targetURL); 
+                try {
+                    proxyRequest(targetURL, req, res);
+                } catch (error) {
+                    res.writeHead(404, 'Proxy Request Error')
+                    res.end(error)
+                }
+                
             }else{
                 res.writeHead(404, 'Invalid Host')
                 res.end('Invalid host: ' + targetURL.hostname);
@@ -157,31 +164,21 @@ proxy.on('connect', (req, clientSocket, head) => {
 
 // Now that proxy is running
 proxy.listen(PORT, HOST, () => {
+    console.log('Running on ' + HOST + ':' + PORT);
 
-    // // Make a request to a tunneling proxy
-    // const options = {
-    //     port: PORT,
-    //     host: HOST,
-    //     method: 'CONNECT',
-    //     path: 'www.google.com:80'
-    // };
-
-    // const req = http.request(options);
-    // req.end();
-
-    // req.on('connect', (res, socket, head) => {
-    //     console.log('got connected!');
-
-    //     // Make a request over an HTTP tunnel
-    //     socket.write('GET / HTTP/1.1\r\n' +
-    //         'Host: www.google.com:80\r\n' +
-    //         'Connection: close\r\n' +
-    //         '\r\n');
-    //     socket.on('data', (chunk) => {
-    //         // console.log(chunk.toString());
-    //     });
-    //     socket.on('end', () => {
-    //         proxy.close();
-    //     });
-    // });
+    /* TEST: 
+    function test(url) {
+        const http = require('http');
+        const req = http.get(url || "http://127.0.0.1:9000", (res) => {
+            console.log(`STATUS: ${res.statusCode}`); 
+            console.log(`HEADERS: `, req.headers) 
+            res.on('data', (chunk) => {
+                console.log(`DATA: ${chunk.toString()}`)
+            })
+            res.on('end', () => {
+                console.log("<!RESPONSE END!>")
+            })
+        })
+    }
+    ^--TEST*/
 });
