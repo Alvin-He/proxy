@@ -65,11 +65,12 @@ function withCORS(headers, request) {
  * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
 function proxyRequest(targetURL, clientReq, clientRes) {
+    console.log('Proxying: ' + targetURL)
     let options = {
         hostname: targetURL.hostname,
         port: targetURL.port || 80,
         path: targetURL.pathname || '/',
-        mathod: 'GET',
+        method: 'GET',
         headers: new Object
     }
     for (let header in clientReq.headers) {
@@ -86,16 +87,23 @@ function proxyRequest(targetURL, clientReq, clientRes) {
 
     const proxyReq = http.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
     
-    // proxyReq.end();
+    proxyReq.end();
 }
 
-function proxyResponse(proxyReq,proxyRes, clientReq, clientRes) {
+function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     console.log(`STATUS: ${proxyRes.statusCode}`);
     console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
 
     const statusCode = proxyRes.statusCode
     proxyRes.headers = withCORS(proxyRes.headers, clientReq)
 
+    if (statusCode > 300 && statusCode < 304){ // 301, 302, 303 redirect response handling
+        const locationHeader = proxyRes.headers.location
+        if (locationHeader) {
+            proxyReq.meta = clientReq.meta; 
+            proxyRequest(new URL (locationHeader), proxyReq, clientRes)
+        }
+    } //else{
         clientRes.writeHead(statusCode, proxyRes.headers);
         proxyRes.on('data', (chunk) => {
             clientRes.write(chunk)
@@ -103,14 +111,19 @@ function proxyResponse(proxyReq,proxyRes, clientReq, clientRes) {
         });
         proxyRes.on('end', () => {
             console.log('No more data in response.');
-            res.end()
+            clientRes.end()
         });
+    // }
 }
 
 
 // Create an HTTP tunneling proxy
 const proxy = http.createServer((req, res) => {
     console.log(req.url)
+
+    req.meta = { // meta data, used by the proxy
+        redirectCount = 0,  
+    };
 
     // CROS-Pre-flight request response eg: http method OPTIONS
     var cors_headers = withCORS({}, req);
@@ -124,8 +137,7 @@ const proxy = http.createServer((req, res) => {
         
         if (targetURL && targetURL != '/') {
             targetURL = new URL(targetURL)
-            if (isValidHostName(targetURL.hostname)) {
-                console.log(targetURL); 
+            if (isValidHostName(targetURL.hostname)) { 
                 try {
                     proxyRequest(targetURL, req, res);
                 } catch (error) {
@@ -169,11 +181,11 @@ proxy.listen(PORT, HOST, () => {
     /* TEST: 
     function test(url) {
         const http = require('http');
-        const req = http.get(url || "http://127.0.0.1:9000", (res) => {
+        const req = http.get(url ? 'http://127.0.0.1:9000/' + url : 'http://127.0.0.1:9000', (res) => {
             console.log(`STATUS: ${res.statusCode}`); 
-            console.log(`HEADERS: `, req.headers) 
+            console.log(`HEADERS: `, res.headers) 
             res.on('data', (chunk) => {
-                console.log(`DATA: ${chunk.toString()}`)
+                console.log(`DATA: ${chunk}`)
             })
             res.on('end', () => {
                 console.log("<!RESPONSE END!>")
