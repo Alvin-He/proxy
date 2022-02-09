@@ -97,13 +97,24 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     const statusCode = proxyRes.statusCode
     proxyRes.headers = withCORS(proxyRes.headers, clientReq)
 
-    if (statusCode > 300 && statusCode < 304){ // 301, 302, 303 redirect response handling
+    if (statusCode > 300 && statusCode < 308){ // 301, 302, 303 redirect response handling
         const locationHeader = proxyRes.headers.location
         if (locationHeader) {
+
             proxyReq.meta = clientReq.meta; 
+            // Remove all listeners (=reset events to initial state)
+            clientReq.removeAllListeners();
+
+            // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
+            // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than 'dead'.
+            // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
+            proxyReq.removeAllListeners('error');
+            proxyReq.once('error', () => {}); 
+            proxyReq.destroy(); 
+
             proxyRequest(new URL (locationHeader), proxyReq, clientRes)
         }
-    } //else{
+    } else{
         clientRes.writeHead(statusCode, proxyRes.headers);
         proxyRes.on('data', (chunk) => {
             clientRes.write(chunk)
@@ -113,7 +124,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
             console.log('No more data in response.');
             clientRes.end()
         });
-    // }
+    }
 }
 
 
@@ -122,7 +133,7 @@ const proxy = http.createServer((req, res) => {
     console.log(req.url)
 
     req.meta = { // meta data, used by the proxy
-        redirectCount = 0,  
+        redirectCount : 0, 
     };
 
     // CROS-Pre-flight request response eg: http method OPTIONS
