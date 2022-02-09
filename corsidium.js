@@ -43,7 +43,9 @@ function withCORS(headers, request) {
     if (request.method === 'OPTIONS' && corsMaxAge) {
         headers['access-control-max-age'] = corsMaxAge;
     }
-    if (request.headers['access-control-request-method']) {
+    // console.log('Headers: ') 
+    // console.log(request)
+    if (request.headers['access-control-request-method']){
         headers['access-control-allow-methods'] = request.headers['access-control-request-method'];
         delete request.headers['access-control-request-method'];
     }
@@ -65,10 +67,13 @@ function withCORS(headers, request) {
  * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
 function proxyRequest(targetURL, clientReq, clientRes) {
+
     console.log('Proxying: ' + targetURL)
     let options = {
         hostname: targetURL.hostname,
-        port: targetURL.port || 80,
+        protocol: targetURL.protocol || 'http:',
+        // default port based on protocols(http:80 https:443)
+        port: targetURL.port || targetURL.protocol == 'http:' ? 80 : 443,
         path: targetURL.pathname || '/',
         method: 'GET',
         headers: new Object
@@ -85,23 +90,29 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         }   
     }
 
-    const proxyReq = http.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
-    
+    // http handling
+    let proxyReq
+    if (options.protocol == 'http:') {
+        proxyReq = http.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
+    } else { // https handling 
+        proxyReq = https.request(options, (res => {proxyResponse(proxyReq, res, clientReq, clientRes)}));
+    }
     proxyReq.end();
 }
 
 function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     console.log(`STATUS: ${proxyRes.statusCode}`);
-    console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
+    // console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
 
-    const statusCode = proxyRes.statusCode
-    proxyRes.headers = withCORS(proxyRes.headers, clientReq)
+    const statusCode = proxyRes.statusCode;
 
     if (statusCode > 300 && statusCode < 308){ // 301, 302, 303 redirect response handling
         const locationHeader = proxyRes.headers.location
         if (locationHeader) {
 
             proxyReq.meta = clientReq.meta; 
+            proxyReq.headers = clientReq.headers; // copy over the initial request headers
+
             // Remove all listeners (=reset events to initial state)
             clientReq.removeAllListeners();
 
@@ -115,13 +126,16 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
             proxyRequest(new URL (locationHeader), proxyReq, clientRes)
         }
     } else{
+
+        proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
+
         clientRes.writeHead(statusCode, proxyRes.headers);
         proxyRes.on('data', (chunk) => {
             clientRes.write(chunk)
-            console.log(`BODY: ${chunk}`);
+            // console.log(`BODY: ${chunk}`);
         });
         proxyRes.on('end', () => {
-            console.log('No more data in response.');
+            // console.log('No more data in response.');
             clientRes.end()
         });
     }
