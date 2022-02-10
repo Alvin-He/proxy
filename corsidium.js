@@ -175,7 +175,7 @@ const proxy = http.createServer((req, res) => {
 
     };
 
-    console.log(getCurrentUrlFromCookie(req.headers.cookie))
+    const currentURL = getCurrentUrlFromCookie(req.headers.cookie);
     // CROS-Pre-flight request response eg: http method OPTIONS
     var cors_headers = withCORS({}, req);
     if (req.method === 'OPTIONS') {
@@ -186,7 +186,12 @@ const proxy = http.createServer((req, res) => {
     }else if (req.method === 'GET' && /^\/https?:/.test(req.url)) {
         let targetURL = req.url.substring(1);
         try {
-            targetURL = new URL(targetURL)
+            if (currentURL) { // add the current url if present 
+                targetURL = new URL(currentURL + targetURL);
+            }else {
+                targetURL = new URL(targetURL);
+            }
+            
 
             if (isValidHostName(targetURL.hostname)) {
                 try {
