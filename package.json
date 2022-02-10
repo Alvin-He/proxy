@@ -1,31 +1,11 @@
 {
-  "name": "cors-anywhere",
+  "name": "corsidium-glitch-testing",
   "version": "0.4.4",
-  "description": "CORS Anywhere is a reverse proxy which adds CORS headers to the proxied request. Request URL is taken from the path",
-  "license": "MIT",
-  "author": "Rob Wu <rob@robwu.nl>",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Rob--W/cors-anywhere.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Rob--W/cors-anywhere/issues/",
-    "email": "rob@robwu.nl"
-  },
-  "keywords": [
-    "cors",
-    "cross-domain",
-    "http-proxy",
-    "proxy",
-    "heroku"
-  ],
-  "main": "./lib/cors-anywhere.js",
+  "description": "corsidium glitch testing server",
+  "main": "./corsidium.js",
   "files": [
     "lib/",
-    "test/",
-    "Procfile",
-    "demo.html",
-    "server.js"
+    "corsidium.js"
   ],
   "dependencies": {
     "http-proxy": "^1.18.1",
