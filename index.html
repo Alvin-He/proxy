@@ -9,7 +9,7 @@
 <body>
     <iframe id = "main" style="position:fixed; top:0; left:0; bottom:0; right:0; width:100%; height:100%; border:none; margin:0; padding:0; overflow:hidden;"></iframe>
     <script>
-        var cors_api_url = 'http://localhost:8080/';
+        var cors_api_url = 'http://localhost:9000/';
         var frame = document.getElementById("main"); 
         function doCORSRequest(url) {
             var x = new XMLHttpRequest();
@@ -21,9 +21,10 @@
                 );
                 frame.contentDocument.getElementsByTagName("html")[0].innerHTML = x.responseText;
             };
+            document.cookie = "CURRENT_URL=" + url + "; path = '/'"; 
             x.send("");
         }
-
+        doCORSRequest("https://discord.com")
     </script>
 </body>
 </html>

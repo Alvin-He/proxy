@@ -11,6 +11,7 @@
 
     if possible, get it near the speed of Palladium: https://github.com/LudicrousDevelopment/Palladium.git
 */
+'use strict';
 
 const net = require('net')
 const http = require('http')
@@ -29,6 +30,18 @@ function isValidHostName(hostname) {
         net.isIP(hostname)) // if previous failed, check for ip addrress
     );
 }
+
+function getCurrentUrlFromCookie (cookieString) {
+    if (cookieString) {
+        for (const cookie of cookieString.split(';')){
+            const parts = cookie.match(/(.*)?=(.*)?/)
+            if (parts && parts[1] == "CURRENT_URL") {
+                console.log('passed')
+                return parts[2]
+            }
+        };
+    }
+};
 
 /**
  * cors-anywhere 0.4.4 COMMIT 70aaa22 /lib/cors-anywhere.js L47-L71  
@@ -130,7 +143,11 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     } else{
 
         proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
-        proxyRes.headers['Content-Security-Policy'] = 'default-src *'; 
+        proxyRes.headers['Content-Security-Policy'] = 'default-src *';
+        if (proxyRes.headers['Content-Security-Policy']) {
+            delete proxyRes.headers['Content-Security-Policy'];
+        }
+        
         clientRes.writeHead(statusCode, proxyRes.headers);
         proxyRes.on('data', (chunk) => {
             clientRes.write(chunk)
@@ -146,18 +163,19 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
 
 // Create an HTTP tunneling proxy
 const proxy = http.createServer((req, res) => {
-    console.log(req.url)
-
+    
+    
     req.meta = { // meta data, used by the proxy
         redirectCount : 0, 
         location : '', 
-        baseURL : (
-            (   (req.connection.encrypted || /^\s*https/.test(req.headers['x-forwarded-proto'])) ? 
-            'https' : 'http') + '//' + req.headers.host
-        ), 
+        // baseURL : (
+        //     (   (req.connection.encrypted || /^\s*https/.test(req.headers['x-forwarded-proto'])) ? 
+        //     'https' : 'http') + '//' + req.headers.host
+        // ), 
 
     };
 
+    console.log(getCurrentUrlFromCookie(req.headers.cookie))
     // CROS-Pre-flight request response eg: http method OPTIONS
     var cors_headers = withCORS({}, req);
     if (req.method === 'OPTIONS') {
@@ -169,23 +187,22 @@ const proxy = http.createServer((req, res) => {
         let targetURL = req.url.substring(1);
         try {
             targetURL = new URL(targetURL)
-        } catch (error) {
+
+            if (isValidHostName(targetURL.hostname)) {
+                try {
+                    proxyRequest(targetURL, req, res);
+                } catch (error) {
+                    res.writeHead(404, 'Proxy Request Error')
+                    res.end(error)
+                }
+            } else {
+                res.writeHead(404, 'Invalid Host')
+                res.end('Invalid host: ' + targetURL.hostname);
+            }
+        } catch (error) { // this'll fire when targetURL = nre URL (targetURL); In case we get an invalid URL
             res.writeHead(404, 'Invalid URL'); 
             res.end('Invalid URL ' + targetURL);
         }
-        
-        if (isValidHostName(targetURL.hostname)) { 
-            try {
-                proxyRequest(targetURL, req, res);
-            } catch (error) {
-                res.writeHead(404, 'Proxy Request Error')
-                res.end(error)
-            }    
-        }else{
-            res.writeHead(404, 'Invalid Host')
-            res.end('Invalid host: ' + targetURL.hostname);
-        }
-
     }else{
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('okay');
