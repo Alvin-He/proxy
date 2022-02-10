@@ -167,7 +167,7 @@ const proxy = http.createServer((req, res) => {
     
     req.meta = { // meta data, used by the proxy
         redirectCount : 0, 
-        location : '', 
+        location : getCurrentUrlFromCookie(req.headers.cookie), 
         // baseURL : (
         //     (   (req.connection.encrypted || /^\s*https/.test(req.headers['x-forwarded-proto'])) ? 
         //     'https' : 'http') + '//' + req.headers.host
@@ -175,7 +175,6 @@ const proxy = http.createServer((req, res) => {
 
     };
 
-    const currentURL = getCurrentUrlFromCookie(req.headers.cookie);
     // CROS-Pre-flight request response eg: http method OPTIONS
     var cors_headers = withCORS({}, req);
     if (req.method === 'OPTIONS') {
@@ -183,11 +182,14 @@ const proxy = http.createServer((req, res) => {
         res.writeHead(200, cors_headers);
         res.end();
         return;
-    }else if (req.method === 'GET' && /^\/https?:/.test(req.url)) {
+    }else if (req.method === 'GET') { //&& /^\/https?:/.test(req.url)
         let targetURL = req.url.substring(1);
         try {
-            if (currentURL) { // add the current url if present 
-                targetURL = new URL(currentURL + targetURL);
+            if (req.meta.location) { // add the current url if present 
+                targetURL = new URL(
+                    (/\/$/.test(req.meta.location) ? 
+                    req.meta.location : req.meta.location + '/') 
+                    + targetURL);
             }else {
                 targetURL = new URL(targetURL);
             }
@@ -204,7 +206,7 @@ const proxy = http.createServer((req, res) => {
                 res.writeHead(404, 'Invalid Host')
                 res.end('Invalid host: ' + targetURL.hostname);
             }
-        } catch (error) { // this'll fire when targetURL = nre URL (targetURL); In case we get an invalid URL
+        } catch (error) { // this'll fire when targetURL = new URL (targetURL) errored; In case we get an invalid URL
             res.writeHead(404, 'Invalid URL'); 
             res.end('Invalid URL ' + targetURL);
         }
@@ -236,18 +238,23 @@ proxy.listen(PORT, HOST, () => {
     console.log('Running on ' + HOST + ':' + PORT);
 
     /* TEST: 
-    function test(url) {
+    function test(url, noDATA) {
         const http = require('http');
-        const req = http.get(url ? 'http://127.0.0.1:9000/' + url : 'http://127.0.0.1:9000', (res) => {
+        const req = http.request(url ? 'http://127.0.0.1:9000/' + url : 'http://127.0.0.1:9000', (res) => {
             console.log(`STATUS: ${res.statusCode}`); 
-            console.log(`HEADERS: `, res.headers) 
-            res.on('data', (chunk) => {
-                console.log(`DATA: ${chunk}`)
-            })
+            console.log(`HEADERS: `, res.headers)
+            if (!noDATA) {
+                res.on('data', (chunk) => {
+                    console.log(`DATA: ${chunk}`)
+                })
+            } 
             res.on('end', () => {
                 console.log("<!RESPONSE END!>")
             })
         })
+        req.setHeader('Cookie', 'CURRENT_URL='+url)
+        req.end(); 
     }
     ^--TEST*/
+
 });
