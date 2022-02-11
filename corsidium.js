@@ -18,10 +18,25 @@ const http = require('http')
 const https = require('https')
 const { URL } = require('url')
 const regexp_tld = require('./lib/regexp-top-level-domain');
+const fs = require('fs')
 
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 9000
 const CROS_MAX_AGE = 0
+
+function localServerResponse(path, clientRes) {
+    fs.readFile(path, 'utf8', function(error, data) {
+        if (error) {
+            console.error(error);
+            clientRes.writeHead(500, 'Internal Data Access ERROR');
+            clientRes.end();
+        } else {
+            clientRes.writeHead(200, {'content-type' : /\.html$/.test(path) ? 'text/html' : 'text/plain'})
+            clientRes.write(data);
+            clientRes.end()
+        }
+    });
+}
 
 function isValidHostName(hostname) {
     return !!(
@@ -175,6 +190,7 @@ const proxy = http.createServer((req, res) => {
 
     };
 
+
     // CROS-Pre-flight request response eg: http method OPTIONS
     var cors_headers = withCORS({}, req);
     if (req.method === 'OPTIONS') {
@@ -184,31 +200,36 @@ const proxy = http.createServer((req, res) => {
         return;
     }else if (req.method === 'GET') { //&& /^\/https?:/.test(req.url)
         let targetURL = req.url.substring(1);
-        try {
-            if (req.meta.location) { // add the current url if present 
-                targetURL = new URL(
-                    (/\/$/.test(req.meta.location) ? 
-                    req.meta.location : req.meta.location + '/') 
-                    + targetURL);
-            }else {
-                targetURL = new URL(targetURL);
-            }
-            
-
-            if (isValidHostName(targetURL.hostname)) {
-                try {
-                    proxyRequest(targetURL, req, res);
-                } catch (error) {
-                    res.writeHead(404, 'Proxy Request Error')
-                    res.end(error)
+        console.log(targetURL);
+        if (targetURL == 'index.html') {
+            localServerResponse('index.html', res); 
+        }else {
+            try {
+                if (req.meta.location) { // add the current url if present 
+                    targetURL = new URL(
+                        (/\/$/.test(req.meta.location) ? 
+                        req.meta.location : req.meta.location + '/') 
+                        + targetURL);
+                }else {
+                    targetURL = new URL(targetURL);
                 }
-            } else {
-                res.writeHead(404, 'Invalid Host')
-                res.end('Invalid host: ' + targetURL.hostname);
+                
+    
+                if (isValidHostName(targetURL.hostname)) {
+                    try {
+                        proxyRequest(targetURL, req, res);
+                    } catch (error) {
+                        res.writeHead(404, 'Proxy Request Error')
+                        res.end(error)
+                    }
+                } else {
+                    res.writeHead(404, 'Invalid Host')
+                    res.end('Invalid host: ' + targetURL.hostname);
+                }
+            } catch (error) { // this'll fire when targetURL = new URL (targetURL) errored; In case we get an invalid URL
+                res.writeHead(404, 'Invalid URL'); 
+                res.end('Invalid URL ' + targetURL);
             }
-        } catch (error) { // this'll fire when targetURL = new URL (targetURL) errored; In case we get an invalid URL
-            res.writeHead(404, 'Invalid URL'); 
-            res.end('Invalid URL ' + targetURL);
         }
     }else{
         res.writeHead(200, { 'Content-Type': 'text/plain' });
