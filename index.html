@@ -19,7 +19,9 @@
                     "GET" + ' ' + url + '\n' +
                     x.status + ' ' + x.statusText
                 );
-                frame.contentDocument.getElementsByTagName("html")[0].innerHTML = x.responseText;
+                // frame.contentDocument.getElementsByTagName("html")[0].innerHTML = x.responseText;
+                window.document.getElementsByTagName('html')[0].innerHTML = "";
+                window.document.write(x.responseText)
             };
             document.cookie = "CURRENT_URL=" + url + "; path = '/'"; 
             x.send("");

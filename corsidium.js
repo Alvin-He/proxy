@@ -159,6 +159,8 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
 
         proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
         proxyRes.headers['Content-Security-Policy'] = 'default-src *';
+        proxyRes.headers['X-Frame-Options'] = 'SAMEORIGIN';
+
         if (proxyRes.headers['Content-Security-Policy']) {
             delete proxyRes.headers['Content-Security-Policy'];
         }
@@ -177,7 +179,10 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
 
 
 // Create an HTTP tunneling proxy
-const proxy = http.createServer((req, res) => {
+const proxy = https.createServer({
+    key: fs.readFileSync('test/key.pem'),
+    cert: fs.readFileSync('test/cert.pem')
+},(req, res) => {
     
     
     req.meta = { // meta data, used by the proxy
