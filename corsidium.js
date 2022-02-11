@@ -25,7 +25,7 @@ const PORT = process.env.PORT || 3000
 const CROS_MAX_AGE = 0
 
 function localServerResponse(path, clientRes) {
-    fs.readFile(path, 'utf8', function(error, data) {
+    fs.readFile('./' + path, 'utf8', function(error, data) {
         if (error) {
             console.error(error);
             clientRes.writeHead(500, 'Internal Data Access ERROR');
@@ -180,8 +180,8 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
 
 // Create an HTTP tunneling proxy
 const proxy = https.createServer({
-    key: fs.readFileSync('test/key.pem'),
-    cert: fs.readFileSync('test/cert.pem')
+    key: fs.readFileSync('./test/key.pem'),
+    cert: fs.readFileSync('./test/cert.pem')
 },(req, res) => {
     
     
