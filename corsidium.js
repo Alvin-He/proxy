@@ -21,7 +21,7 @@ const regexp_tld = require('./lib/regexp-top-level-domain');
 const fs = require('fs')
 
 const HOST = process.env.HOST || '127.0.0.1' 
-const PORT = process.env.PORT || 9000
+const PORT = process.env.PORT || 3000
 const CROS_MAX_AGE = 0
 
 function localServerResponse(path, clientRes) {
