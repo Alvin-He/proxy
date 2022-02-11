@@ -14,8 +14,6 @@
   "scripts": {
     "lint": "eslint .",
     "start": "node proxy/corsidium.js",
-    "test": "mocha ./test/test*.js --reporter spec",
-    "test-coverage": "istanbul cover ./node_modules/.bin/_mocha -- test/test.js test/test-ratelimit.js --reporter spec"
   },
   "engines": {
     "node": "16.0.0"
