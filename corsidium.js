@@ -22,11 +22,13 @@ const fs = require('fs')
 
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
+const DIR_PATH =  fs.access('./corisidium.js', (err) => {if (err) {return 'proxy/'}else{return '/'}}); 
+
 const CROS_MAX_AGE = 0
 
 function localServerResponse(path, clientRes) {
     console.log("Local Resource Request: " + path); 
-    fs.readFile('./' + path, 'utf8', function(error, data) {
+    fs.readFile(DIR_PATH + path, 'utf8', function(error, data) {
         if (error) {
             console.error(error);
             clientRes.writeHead(500, 'Internal Data Access ERROR');
@@ -181,8 +183,8 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
 
 // Create an HTTP tunneling proxy
 const proxy = https.createServer({
-    key: fs.readFileSync('./test/key.pem'),
-    cert: fs.readFileSync('./test/cert.pem')
+    key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
+    cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
 },(req, res) => {
     
     
