@@ -25,6 +25,7 @@ const PORT = process.env.PORT || 3000
 const CROS_MAX_AGE = 0
 
 function localServerResponse(path, clientRes) {
+    console.log("Local Resource Request: " + path); 
     fs.readFile('./' + path, 'utf8', function(error, data) {
         if (error) {
             console.error(error);
@@ -51,7 +52,7 @@ function getCurrentUrlFromCookie (cookieString) {
         for (const cookie of cookieString.split(';')){
             const parts = cookie.match(/(.*)?=(.*)?/)
             if (parts && parts[1] == "CURRENT_URL") {
-                console.log('passed')
+                console.log('Current Url: ' + parts[2]);
                 return parts[2]
             }
         };
