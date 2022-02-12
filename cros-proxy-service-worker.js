@@ -1,6 +1,6 @@
 
-const CROS_SERVER_ENDPOINT = "http://127.0.0.1:8080/";
-let master_url = "";
+const CROS_SERVER_ENDPOINT = "http://127.0.0.1:3000/";
+let current_url = "";
 
 self.addEventListener('install', function (event) {
     console.log('Service worker installed.');
@@ -9,7 +9,7 @@ self.addEventListener('install', function (event) {
 
 self.addEventListener("message", function (event){
     if (event.data && event.data.type == "UPDATE_MASTER_URL") {
-        master_url = event.data.data;
+        current_url = event.data.data;
     };    
 })
 
@@ -36,7 +36,7 @@ async function handler(request) {
         response = await fetch(newReq(
             request,
             CROS_SERVER_ENDPOINT +
-            request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):(8080|5500)/, master_url)
+            request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):(8080|5500)/, current_url)
         ));
     }
     return response;

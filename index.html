@@ -7,10 +7,25 @@
     <title>Document</title>
 </head>
 <body>
+    
   <button onclick = "doCORSRequest();" >Load WebPage</button>
   <input type="url" id="Url" size="100">
     <script type = "text/javascript">
-        var cors_api_url = 'http://127.0.0.1:3000' ? 'http://127.0.0.1:3000' : 'https://cros-proxy-testing.glitch.me/';
+        if ('serviceWorker' in navigator) {
+            // window.addEventListener('load', function () {
+            navigator.serviceWorker.register('cros-proxy-service-worker.js').then(function (registration) {
+                // Registration was successful
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                return;
+            }, function (err) {
+                // registration failed :(
+                console.log('ServiceWorker registration failed: ', err);
+                return err;
+            });
+            // });
+        }
+
+        var cors_api_url = 'http://127.0.0.1:3000/' ? 'http://127.0.0.1:3000/' : 'https://cros-proxy-testing.glitch.me/';
         function doCORSRequest() {
             var url = document.getElementById('Url').value; 
             var x = new XMLHttpRequest();

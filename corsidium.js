@@ -18,12 +18,17 @@ const http = require('http')
 const https = require('https')
 const { URL } = require('url')
 const regexp_tld = require('./lib/regexp-top-level-domain');
-const fs = require('fs')
+const fs = require('fs');
+const path = require('path');
+const localResource = [ // local resource that the client can access
+    'index.html',
+    'cros-proxy-service-worker.js'
+]
 
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
-const DIR_PATH =  fs.access('./corisidium.js', (err) => {if (err) {return 'proxy/'}else{return '/'}}); 
-
+let DIR_PATH = new Promise((resolve, reject) => {fs.access('./corsidium.js',(err)=>{if(err){DIR_PATH = 'proxy/';}else{DIR_PATH='./';}resolve();});});
+ 
 const CROS_MAX_AGE = 0
 
 function localServerResponse(path, clientRes) {
@@ -53,9 +58,9 @@ function getCurrentUrlFromCookie (cookieString) {
     if (cookieString) {
         for (const cookie of cookieString.split(';')){
             const parts = cookie.match(/(.*)?=(.*)?/)
-            if (parts && parts[1] == "CURRENT_URL") {
+            if (parts && parts[1].trim() == "CURRENT_URL") {
                 console.log('Current Url: ' + parts[2]);
-                return parts[2]
+                return parts[2].trim()
             }
         };
     }
@@ -180,17 +185,11 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     }
 }
 
-
-// Create an HTTP tunneling proxy
-const proxy = https.createServer({
-    key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
-    cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
-},(req, res) => {
-    
-    
+// Listeners 
+function requestListener(req, res) {
     req.meta = { // meta data, used by the proxy
-        redirectCount : 0, 
-        location : getCurrentUrlFromCookie(req.headers.cookie), 
+        redirectCount: 0,
+        location: getCurrentUrlFromCookie(req.headers.cookie),
         // baseURL : (
         //     (   (req.connection.encrypted || /^\s*https/.test(req.headers['x-forwarded-proto'])) ? 
         //     'https' : 'http') + '//' + req.headers.host
@@ -206,49 +205,56 @@ const proxy = https.createServer({
         res.writeHead(200, cors_headers);
         res.end();
         return;
-    }else if (req.method === 'GET') { //&& /^\/https?:/.test(req.url)
+    } else if (req.method === 'GET') { //&& /^\/https?:/.test(req.url)
         let targetURL = req.url.substring(1);
         console.log(targetURL);
-        if (targetURL == 'index.html') {
-            localServerResponse('index.html', res); 
-        }else {
-            try {
-                if (req.meta.location) { // add the current url if present 
-                    targetURL = new URL(
-                        (/\/$/.test(req.meta.location) ? 
-                        req.meta.location : req.meta.location + '/') 
-                        + targetURL);
-                }else {
-                    targetURL = new URL(targetURL);
-                }
-                
-    
-                if (isValidHostName(targetURL.hostname)) {
-                    try {
-                        proxyRequest(targetURL, req, res);
-                    } catch (error) {
-                        res.writeHead(404, 'Proxy Request Error')
-                        res.end(error)
-                    }
-                } else {
-                    res.writeHead(404, 'Invalid Host')
-                    res.end('Invalid host: ' + targetURL.hostname);
-                }
-            } catch (error) { // this'll fire when targetURL = new URL (targetURL) errored; In case we get an invalid URL
-                res.writeHead(404, 'Invalid URL'); 
-                res.end('Invalid URL ' + targetURL);
+        for (path of localResource) {
+            if (path == targetURL) {
+                localServerResponse(path, res);
+                return true; 
             }
         }
-    }else{
+        try {
+            if (req.meta.location) { // add the current url if present 
+                targetURL = new URL(
+                    (/\/$/.test(req.meta.location) ?
+                        req.meta.location : req.meta.location + '/')
+                    + targetURL);
+            } else {
+                targetURL = new URL(targetURL);
+            }
+
+
+            if (isValidHostName(targetURL.hostname)) {
+                try {
+                    proxyRequest(targetURL, req, res);
+                    return true; 
+                } catch (error) {
+                    res.writeHead(404, 'Proxy Request Error')
+                    res.end('Proxy Request Error:\n' + error)
+                    console.log('Request ERROR: ' + error);
+                    return false;
+                }
+            } else {
+                res.writeHead(404, 'Invalid Host')
+                res.end('Invalid host: ' + targetURL.hostname);
+                console.log('Invalid host: ' + targetURL.hostname);
+                return false; 
+            }
+        } catch (error) { // this'll fire when targetURL = new URL (targetURL) errored; In case we get an invalid URL
+            res.writeHead(404, 'Invalid URL');
+            res.end('Invalid URL ' + targetURL);
+            console.log('Invalid URL ' + targetURL);
+            return false;
+        }
+    } else {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('okay');
+        return false;
     }
-});
+}
 
-
-
-
-proxy.on('connect', (req, clientSocket, head) => {
+function connectListener(req, clientSocket, head) {
     // Connect to an origin server
     const { port, hostname } = new URL(`http://${req.url}`);
     const serverSocket = net.connect(port || 80, hostname, () => {
@@ -260,30 +266,48 @@ proxy.on('connect', (req, clientSocket, head) => {
         serverSocket.pipe(clientSocket);
         clientSocket.pipe(serverSocket);
     });
-});
+}
 
-// Now that proxy is running
-proxy.listen(PORT, HOST, () => {
-    console.log('Running on ' + HOST + ':' + PORT);
+// Async calls 
+(async ()=> {
+    // initiation 
+    await DIR_PATH; 
+    console.log(DIR_PATH);
 
-    /* TEST: 
-    function test(url, noDATA) {
-        const http = require('http');
-        const req = http.request(url ? 'http://127.0.0.1:9000/' + url : 'http://127.0.0.1:9000', (res) => {
-            console.log(`STATUS: ${res.statusCode}`); 
-            console.log(`HEADERS: `, res.headers)
-            if (!noDATA) {
-                res.on('data', (chunk) => {
-                    console.log(`DATA: ${chunk}`)
+    // Create an HTTP tunneling proxy
+    const proxy = https.createServer({
+        key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
+        cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
+    });
+
+    // add listeners 
+    proxy.on('request', requestListener);
+    proxy.on('connect', connectListener);
+
+    // boot the server
+    proxy.listen(PORT, HOST, () => {
+        console.log('Running on ' + HOST + ':' + PORT);
+
+        /* TEST: 
+        function test(url, noDATA) {
+            const http = require('http');
+            const req = http.request(url ? 'http://127.0.0.1:3000/' + url : 'http://127.0.0.1:3000', (res) => {
+                console.log(`STATUS: ${res.statusCode}`); 
+                console.log(`HEADERS: `, res.headers)
+                if (!noDATA) {
+                    res.on('data', (chunk) => {
+                        console.log(`DATA: ${chunk}`)
+                    })
+                } 
+                res.on('end', () => {
+                    console.log("<!RESPONSE END!>")
                 })
-            } 
-            res.on('end', () => {
-                console.log("<!RESPONSE END!>")
             })
-        })
-        req.setHeader('Cookie', 'CURRENT_URL='+url)
-        req.end(); 
-    }
-    ^--TEST*/
+            req.setHeader('Cookie', 'CURRENT_URL='+url)
+            req.end(); 
+        }
+        ^--TEST*/
 
-});
+    });
+})(); 
+
