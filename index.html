@@ -25,22 +25,56 @@
             // });
         }
 
-        var cors_api_url = 'http://127.0.0.1:3000/' ? 'http://127.0.0.1:3000/' : 'https://cros-proxy-testing.glitch.me/';
+        let serviceWorkerFetchs = {} // fetch callbacks url->string : callback->function
+
+        // service worker response listener
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data) {
+                if (event.data.type == 'FETCH_DOCUMENT') {
+                    // loads callback for the according url
+                    if (serviceWorkerFetchs[event.data.url] 
+                    && typeof serviceWorkerFetchs[event.data.url] == 'function') {
+                        serviceWorkerFetchs[event.data.url](event.data.response, event.data.status)
+                    }
+                }
+            }
+        });
+
         function doCORSRequest() {
-            var url = document.getElementById('Url').value; 
-            var x = new XMLHttpRequest();
-            x.open("GET", cors_api_url + url);
-            x.onload = x.onerror = function () {
-                console.log(
-                    "GET" + ' ' + url + '\n' +
-                    x.status + ' ' + x.statusText
-                );
+            let url = document.getElementById('Url').value; 
+            //create callback
+            serviceWorkerFetchs[url] = (response, status) => {
+                console.log("GET" + ' ' + url + ' ' + status);
                 window.document.getElementsByTagName('html')[0].innerHTML = "";
-                window.document.write(x.responseText)
-            };
-            document.cookie = "CURRENT_URL=" + url + "; path = '/'"; 
-            x.send("");
+                if (status == 'ok') {
+                    document.cookie = "CURRENT_URL=" + url + "; path = '/'";
+                    window.document.write(response)
+                }
+                
+            }
+            // tell the serviceWorker to initiate the request 
+            navigator.serviceWorker.controller.postMessage({
+                type : 'FETCH_DOCUMENT', 
+                url : url
+            })
         }
+
+        // var cors_api_url = 'http://127.0.0.1:3000/' ? 'http://127.0.0.1:3000/' : 'https://cros-proxy-testing.glitch.me/';
+        // function doCORSRequest() {
+        //     var url = document.getElementById('Url').value; 
+        //     var x = new XMLHttpRequest();
+        //     x.open("GET", cors_api_url + url);
+        //     x.onload = x.onerror = function () {
+        //         console.log(
+        //             "GET" + ' ' + url + '\n' +
+        //             x.status + ' ' + x.statusText
+        //         );
+        //         window.document.getElementsByTagName('html')[0].innerHTML = "";
+        //         window.document.write(x.responseText)
+        //     };
+        //     document.cookie = "CURRENT_URL=" + url + "; path = '/'"; 
+        //     x.send("");
+        // }
         // doCORSRequest("https://discord.com")
     </script>
 </body>

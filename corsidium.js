@@ -19,7 +19,6 @@ const https = require('https')
 const { URL } = require('url')
 const regexp_tld = require('./lib/regexp-top-level-domain');
 const fs = require('fs');
-const path = require('path');
 const localResource = [ // local resource that the client can access
     'index.html',
     'cros-proxy-service-worker.js'
@@ -39,9 +38,14 @@ function localServerResponse(path, clientRes) {
             clientRes.writeHead(500, 'Internal Data Access ERROR');
             clientRes.end();
         } else {
-            clientRes.writeHead(200, {'content-type' : /\.html$/.test(path) ? 'text/html' : 'text/plain'})
+            clientRes.writeHead(200, {'content-type' : 
+                /\.html$/.test(path)    ? 'text/html'        : 
+                /\.js$/.test(path)      ? 'text/javascript ' : 
+                'text/plain'
+            })
             clientRes.write(data);
             clientRes.end()
+            console.log('STATUS: 200')
         }
     });
 }
@@ -79,8 +83,6 @@ function withCORS(headers, request) {
     if (request.method === 'OPTIONS' && corsMaxAge) {
         headers['access-control-max-age'] = corsMaxAge;
     }
-    // console.log('Headers: ') 
-    // console.log(request)
     if (request.headers['access-control-request-method']){
         headers['access-control-allow-methods'] = request.headers['access-control-request-method'];
         delete request.headers['access-control-request-method'];
@@ -172,6 +174,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
         if (proxyRes.headers['Content-Security-Policy']) {
             delete proxyRes.headers['Content-Security-Policy'];
         }
+
         
         clientRes.writeHead(statusCode, proxyRes.headers);
         proxyRes.on('data', (chunk) => {
@@ -185,7 +188,13 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     }
 }
 
-// Listeners 
+// Listeners
+/**
+ * Listens to incoming http requests, (http.server.prototype).on('request', requestListener);
+ * @param {http.IncomingMessage} req Request sent from the client 
+ * @param {http.ServerResponse} res Response that's going to be sent to the client
+ * @returns {Boolean}
+ */
 function requestListener(req, res) {
     req.meta = { // meta data, used by the proxy
         redirectCount: 0,
@@ -204,50 +213,63 @@ function requestListener(req, res) {
         // Pre-flight request. Reply successfully:
         res.writeHead(200, cors_headers);
         res.end();
-        return;
+        console.log('Preflight Request Responded: ' + req.url);
+        return true;
     } else if (req.method === 'GET') { //&& /^\/https?:/.test(req.url)
-        let targetURL = req.url.substring(1);
-        console.log(targetURL);
-        for (path of localResource) {
-            if (path == targetURL) {
-                localServerResponse(path, res);
-                return true; 
-            }
-        }
+        let targetURL
+
         try {
-            if (req.meta.location) { // add the current url if present 
-                targetURL = new URL(
-                    (/\/$/.test(req.meta.location) ?
-                        req.meta.location : req.meta.location + '/')
-                    + targetURL);
-            } else {
-                targetURL = new URL(targetURL);
+            // p-document-get overrides cookies and local resource
+            if (req.headers['p-document-get']) { 
+                targetURL = new URL(req.headers['p-document-get']);
+
+            } else { 
+                targetURL = req.url.substring(1);
+                // local resource loading 
+                for (const path of localResource) {
+                    if (path == targetURL) {
+                        localServerResponse(path, res);
+                        return true;
+                    }
+                }
+                // CURRENT_URL cookie handling
+                if (req.meta.location) { // add the current url if present 
+                    targetURL = new URL(
+                        (/\/$/.test(req.meta.location) ?
+                            req.meta.location : req.meta.location + '/')
+                        + targetURL);
+                // Direct URL path proxy request handling 
+                } else {
+                    targetURL = new URL(targetURL);
+                }
             }
 
-
+            // final check before making the request 
             if (isValidHostName(targetURL.hostname)) {
                 try {
-                    proxyRequest(targetURL, req, res);
+                    proxyRequest(targetURL, req, res); // send the request
                     return true; 
-                } catch (error) {
+
+//                  ERROR HANDLING                      //
+                } catch (error) { // when proxy request failed
                     res.writeHead(404, 'Proxy Request Error')
                     res.end('Proxy Request Error:\n' + error)
                     console.log('Request ERROR: ' + error);
                     return false;
                 }
-            } else {
+            } else { // when host name is invalid 
                 res.writeHead(404, 'Invalid Host')
                 res.end('Invalid host: ' + targetURL.hostname);
                 console.log('Invalid host: ' + targetURL.hostname);
                 return false; 
             }
-        } catch (error) { // this'll fire when targetURL = new URL (targetURL) errored; In case we get an invalid URL
+        } catch (error) { // this'll fire when new URL (targetURL) errored; In case we get an invalid URL
             res.writeHead(404, 'Invalid URL');
             res.end('Invalid URL ' + targetURL);
             console.log('Invalid URL ' + targetURL);
             return false;
         }
-    } else {
+    } else { // don't even know why I put this......
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('okay');
         return false;
@@ -274,8 +296,8 @@ function connectListener(req, clientSocket, head) {
     await DIR_PATH; 
     console.log(DIR_PATH);
 
-    // Create an HTTP tunneling proxy
-    const proxy = https.createServer({
+    // Create the server
+    const proxy = http.createServer({
         key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
         cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
     });
