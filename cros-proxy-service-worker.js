@@ -1,4 +1,4 @@
-const CROS_SERVER_ENDPOINT = "http://127.0.0.1:3000/";
+const CROS_SERVER_ENDPOINT = "https://127.0.0.1:3000/";
 let current_url = "";
 
 // Escaping a string into a regexp, https://stackoverflow.com/a/494122
@@ -18,7 +18,7 @@ self.addEventListener("message", async function (event){
             const url = event.data.url
             let response, status
             try {
-                // fetch and parse
+                // fetch and parse 
                 response = await parseHTML(await fetchDocument(url), url);
                 status = 'ok';
             } catch (error) {
@@ -40,11 +40,29 @@ self.addEventListener("message", async function (event){
      
 })
 
+/**
+ * 
+ * @param {String} htmlDocument 
+ * @param {String} url 
+ * @returns 
+ */
 async function parseHTML(htmlDocument, url) {
-    const regUrl = new RegExp(RegExp.escape(url), 'guim')
+    let regUrl = RegExp.escape(url).split(/https?:\/\//)[1] // generates the escaped domain name
+        regUrl = new RegExp(regUrl, 'guim') // generates the actual regExp
+    
+    // add async to script tags so we don't get blocked for using document.write
+    for (scriptTag of htmlDocument.matchAll(/<script.*?/g)) {
+        console.log(htmlDocument.slice(0, scriptTag.index + 7) + ' async ' + htmlDocument.slice(scriptTag.index + 7))
+    }
+
     // remove any url pointing towards the proxied document's origional domain
     // and point them towards our proxy server. It's done on the client so we don't overload the server.
-    return htmlDocument.replace(regUrl, CROS_SERVER_ENDPOINT)
+    htmlDocument = htmlDocument.replace(
+        regUrl, 
+        // the domain name of our endpoint
+        CROS_SERVER_ENDPOINT.substring(0, CROS_SERVER_ENDPOINT.length - 1).split(/https?:\/\//)[1])
+
+    return htmlDocument
 }
 
 // Fetch a document from server

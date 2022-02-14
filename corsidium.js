@@ -106,7 +106,7 @@ function withCORS(headers, request) {
  */
 function proxyRequest(targetURL, clientReq, clientRes) {
 
-    console.log('Proxying: ' + targetURL)
+    // console.log('Proxying: ' + targetURL)
     // clientReq.meta.location += targetURL.href; 
     let options = {
         hostname: targetURL.hostname,
@@ -136,11 +136,20 @@ function proxyRequest(targetURL, clientReq, clientRes) {
     } else { // https handling 
         proxyReq = https.request(options, (res => {proxyResponse(proxyReq, res, clientReq, clientRes)}));
     }
+    proxyReq.url = targetURL;
     proxyReq.end();
 }
 
+/**
+ * Response handler for the porxy
+ * 
+ * @param {http.IncomingMessage} proxyReq request that we initiated 
+ * @param {http.ServerResponse} proxyRes response that we got from proxyReq
+ * @param {http.IncomingMessage} clientReq Request sent from the client 
+ * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
+ */
 function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
-    console.log(`STATUS: ${proxyRes.statusCode}`);
+    console.log(proxyRes.statusCode + ' ' + proxyReq.method + ' ' + proxyReq.url);
     // console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
 
     const statusCode = proxyRes.statusCode;
@@ -156,7 +165,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
             clientReq.removeAllListeners();
 
             // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
-            // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than 'dead'.
+            // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
             // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
             proxyReq.removeAllListeners('error');
             proxyReq.once('error', () => {}); 
@@ -297,7 +306,7 @@ function connectListener(req, clientSocket, head) {
     console.log(DIR_PATH);
 
     // Create the server
-    const proxy = http.createServer({
+    const proxy = https.createServer({
         key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
         cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
     });

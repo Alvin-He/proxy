@@ -45,10 +45,12 @@
             //create callback
             serviceWorkerFetchs[url] = (response, status) => {
                 console.log("GET" + ' ' + url + ' ' + status);
-                window.document.getElementsByTagName('html')[0].innerHTML = "";
+                // window.document.getElementsByTagName('html')[0].innerHTML = "";
                 if (status == 'ok') {
                     document.cookie = "CURRENT_URL=" + url + "; path = '/'";
-                    window.document.write(response)
+                    document.open()
+                    document.write(response)
+                    document.close()
                 }
                 
             }
