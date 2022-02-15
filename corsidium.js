@@ -24,6 +24,7 @@ const localResource = [ // local resource that the client can access
     'cros-proxy-service-worker.js'
 ]
 
+const ENGINE = process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS != undefined ? 'GLITCH' : 'NATIVE'
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
 let DIR_PATH = new Promise((resolve, reject) => {fs.access('./corsidium.js',(err)=>{if(err){DIR_PATH = 'proxy/';}else{DIR_PATH='./';}resolve();});});
@@ -306,10 +307,15 @@ function connectListener(req, clientSocket, head) {
     console.log(DIR_PATH);
 
     // Create the server
-    const proxy = https.createServer({
-        key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
-        cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
-    });
+    let proxy
+    if (ENGINE == 'GLITCH') { // we use http on Glitch because it's already https by default
+        proxy = http.createServer();
+    }else{
+        https.createServer({
+            key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
+            cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
+        });
+    }
 
     // add listeners 
     proxy.on('request', requestListener);
@@ -317,7 +323,7 @@ function connectListener(req, clientSocket, head) {
 
     // boot the server
     proxy.listen(PORT, HOST, () => {
-        console.log('Running on ' + HOST + ':' + PORT);
+        console.log('Running on ' + HOST + ':' + PORT + ' Engine: ' + ENGINE);
 
         /* TEST: 
         function test(url, noDATA) {

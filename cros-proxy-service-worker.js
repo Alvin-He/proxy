@@ -1,4 +1,4 @@
-const CROS_SERVER_ENDPOINT = "https://127.0.0.1:3000/";
+const CROS_SERVER_ENDPOINT = "https://127.0.0.1:3000/"; //'https://cors-proxy-testing.glitch.me'
 let current_url = "";
 
 // Escaping a string into a regexp, https://stackoverflow.com/a/494122
@@ -109,7 +109,7 @@ async function handler(request) {
         response = await fetch(newReq(
             request,
             CROS_SERVER_ENDPOINT +
-            request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):(8080|5500)/, current_url)
+            request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):3000/, current_url)
         ));
     }
     return response;
