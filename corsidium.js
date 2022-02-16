@@ -1,5 +1,5 @@
 // The birthplace of Corsidium, if I can ever finish it
-// infDev 2/16/22 2:31
+// infDev 2/16/22 3:03
 /* TODO: 
     Set up the proxy, 
     support basic redirect & removeal of CORS headers, 
@@ -204,8 +204,8 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
  * @returns {Boolean}
  */
 function requestListener(req, res) {
-    console.log('->' + ' ' + proxyReq.method + ' ' + proxyReq.url);
-    res.on('finish', ()=> {console.log('<-' + proxyRes.statusCode + ' ' + proxyReq.method + ' ' + proxyReq.url);});
+    console.log('->' + ' ' + req.method + ' ' + req.url);
+    res.on('finish', ()=> {console.log('<-' + res.statusCode + ' ' + req.method + ' ' + req.url);});
     req.meta = { // meta data, used by the proxy
         redirectCount: 0,
         location: getCurrentUrlFromCookie(req.headers.cookie),
