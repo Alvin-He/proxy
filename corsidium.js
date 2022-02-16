@@ -1,5 +1,5 @@
 // The birthplace of Corsidium, if I can ever finish it
-
+// infDev 2/16/22 2:31
 /* TODO: 
     Set up the proxy, 
     support basic redirect & removeal of CORS headers, 
@@ -308,16 +308,12 @@ function connectListener(req, clientSocket, head) {
     console.log(DIR_PATH);
 
     // Create the server
-    let proxy
-    if (ENGINE == 'GLITCH') { // we use http on Glitch because it's already https by default
-        proxy = http.createServer();
-    }else{
+    const proxy = ENGINE == 'GLITCH' ? 
+        http.createServer() : // we use http on Glitch because it's already https by default
         https.createServer({
             key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
             cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
         });
-    }
-
     // add listeners 
     proxy.on('request', requestListener);
     proxy.on('connect', connectListener);
