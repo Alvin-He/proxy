@@ -1,4 +1,4 @@
-const CROS_SERVER_ENDPOINT = "https://127.0.0.1:3000/"; //'https://cors-proxy-testing.glitch.me'
+const CROS_SERVER_ENDPOINT = "https://127.0.0.1:3000/"; //'https://cros-proxy-testing.glitch.me'
 let current_url = "";
 
 // Escaping a string into a regexp, https://stackoverflow.com/a/494122

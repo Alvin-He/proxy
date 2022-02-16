@@ -106,7 +106,6 @@ function withCORS(headers, request) {
  * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
 function proxyRequest(targetURL, clientReq, clientRes) {
-
     // console.log('Proxying: ' + targetURL)
     // clientReq.meta.location += targetURL.href; 
     let options = {
@@ -150,7 +149,6 @@ function proxyRequest(targetURL, clientReq, clientRes) {
  * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
 function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
-    console.log(proxyRes.statusCode + ' ' + proxyReq.method + ' ' + proxyReq.url);
     // console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
 
     const statusCode = proxyRes.statusCode;
@@ -206,6 +204,8 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
  * @returns {Boolean}
  */
 function requestListener(req, res) {
+    console.log('->' + ' ' + proxyReq.method + ' ' + proxyReq.url);
+    res.on('finish', ()=> {console.log('<-' + proxyRes.statusCode + ' ' + proxyReq.method + ' ' + proxyReq.url);});
     req.meta = { // meta data, used by the proxy
         redirectCount: 0,
         location: getCurrentUrlFromCookie(req.headers.cookie),
@@ -235,7 +235,7 @@ function requestListener(req, res) {
 
             } else { 
                 targetURL = req.url.substring(1);
-                // local resource loading 
+                // local resource loading, local resource overrides cookies
                 for (const path of localResource) {
                     if (path == targetURL) {
                         localServerResponse(path, res);
@@ -243,7 +243,8 @@ function requestListener(req, res) {
                     }
                 }
                 // CURRENT_URL cookie handling
-                if (req.meta.location) { // add the current url if present 
+                // add the current url if present and it's not the current request url
+                if (req.meta.location && req.meta.location != targetURL) { 
                     targetURL = new URL(
                         (/\/$/.test(req.meta.location) ?
                             req.meta.location : req.meta.location + '/')
