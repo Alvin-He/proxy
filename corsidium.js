@@ -1,5 +1,5 @@
 // The birthplace of Corsidium, if I can ever finish it
-// infDev 2/16/22 3:03
+// infDev
 /* TODO: 
     Set up the proxy, 
     support basic redirect & removeal of CORS headers, 
@@ -114,19 +114,14 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         // default port based on protocols(http:80 https:443)
         port: targetURL.port || targetURL.protocol == 'http:' ? 80 : 443,
         path: targetURL.pathname || '/',
-        method: 'GET',
-        headers: new Object
+        method: clientReq.method,
+        headers: clientReq.headers
     }
-    for (let header in clientReq.headers) {
-        if (clientReq.headers.header) {
-            if (header == "host") {
-                options.headers['host'] = targetURL.hostname;
-            } else if (header == "referer") {
-                continue
-            } else {
-                options.headers[header] = clientReq.headers.header;
-            }
-        }   
+    if (options.headers.host) {
+        options.headers.host = targetURL.hostname; 
+    }
+    if (options.headers.referer) {
+        delete options.headers.referer; 
     }
 
     // http handling
@@ -134,12 +129,18 @@ function proxyRequest(targetURL, clientReq, clientRes) {
     if (options.protocol == 'http:') {
         proxyReq = http.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
     } else { // https handling 
-        proxyReq = https.request(options, (res => {proxyResponse(proxyReq, res, clientReq, clientRes)}));
+        proxyReq = https.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
     }
     proxyReq.url = targetURL;
-    if (proxyReq.method == 'POST') {
+    proxyReq.on('error', (err) => {
+        console.log('ERROR: ' + err)
+        clientRes.writeHead(404, 'INTERNAL ERROR')
+        clientRes.end(err.toString())
+    })
+    if (clientReq.method == 'POST') {
         //client data handling 
         clientReq.on('data', (chunk) => {
+            console.log(chunk.toString())
             proxyReq.write(chunk); 
         }); 
         clientReq.on('end', () => {
@@ -161,18 +162,17 @@ function proxyRequest(targetURL, clientReq, clientRes) {
  */
 function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     // console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
-
     const statusCode = proxyRes.statusCode;
 
     if (statusCode > 300 && statusCode < 308){ // 301, 302, 303 redirect response handling
         const locationHeader = proxyRes.headers.location
         if (locationHeader) {
-
+            console.log('Redirecting ' + proxyReq.url + ' TO-> ' + locationHeader)
             proxyReq.meta = clientReq.meta; 
             proxyReq.headers = clientReq.headers; // copy over the initial request headers
-
             // Remove all listeners (=reset events to initial state)
             clientReq.removeAllListeners();
+            // clientReq.addListener('error')
 
             // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
             // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
@@ -295,7 +295,7 @@ function requestListener(req, res) {
 
     // }else if(req.method === 'POST' ){
 
-    // } else { // don't even know why I put this......
+    } else { // don't even know why I put this......
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('okay');
         return false;

@@ -115,27 +115,29 @@ async function handler(request) {
     return response;
 }
 
-// self.addEventListener('fetch',function (event) {
-//     // console.log(event); 
-//     if (event.request.url.match(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):8080/)) {
-//         console.log("DSR " + event.request.url);
-//         event.respondWith(handler(event.request));
-//     } else if (event.request.url.match(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):5500/)) {
-//         console.log("CSR-NCROS " + event.request.url);
+self.addEventListener('fetch',function (event) {
+    console.log(event.request.method + ' ' + event.request.url)
+    event.respondWith(fetch(event.request))
+    // // console.log(event); 
+    // if (event.request.url.match(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):8080/)) {
+    //     console.log("DSR " + event.request.url);
+    //     event.respondWith(handler(event.request));
+    // } else if (event.request.url.match(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):5500/)) {
+    //     console.log("CSR-NCROS " + event.request.url);
 
         
 
-//         event.respondWith(handler(event.request))
-//     }else{
-//         console.log("Not prefixed with CROS");
-//         // event.url = CROS_SERVER_ENDPOINT + event.url;
-//         // console.log(event.url);
+    //     event.respondWith(handler(event.request))
+    // }else{
+    //     console.log("Not prefixed with CROS");
+    //     // event.url = CROS_SERVER_ENDPOINT + event.url;
+    //     // console.log(event.url);
 
         
-//         event.respondWith(handler(event.request));
+    //     event.respondWith(handler(event.request));
         
-//     }
+    // }
     
     
     
-// });
+});
