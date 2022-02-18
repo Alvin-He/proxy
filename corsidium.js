@@ -137,7 +137,18 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         proxyReq = https.request(options, (res => {proxyResponse(proxyReq, res, clientReq, clientRes)}));
     }
     proxyReq.url = targetURL;
-    proxyReq.end();
+    if (proxyReq.method == 'POST') {
+        //client data handling 
+        clientReq.on('data', (chunk) => {
+            proxyReq.write(chunk); 
+        }); 
+        clientReq.on('end', () => {
+            proxyReq.end();
+        })
+    }else{
+        proxyReq.end()
+    }
+    
 }
 
 /**
@@ -225,7 +236,7 @@ function requestListener(req, res) {
         res.end();
         console.log('Preflight Request Responded: ' + req.url);
         return true;
-    } else if (req.method === 'GET') { //&& /^\/https?:/.test(req.url)
+    } else if (req.method == 'GET' || req.method == 'POST') { //&& /^\/https?:/.test(req.url)
         let targetURL
 
         try {
@@ -280,7 +291,11 @@ function requestListener(req, res) {
             console.log('Invalid URL ' + targetURL);
             return false;
         }
-    } else { // don't even know why I put this......
+    
+
+    // }else if(req.method === 'POST' ){
+
+    // } else { // don't even know why I put this......
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('okay');
         return false;
