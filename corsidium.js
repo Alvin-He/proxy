@@ -131,9 +131,12 @@ function proxyRequest(targetURL, clientReq, clientRes) {
     } else { // https handling 
         proxyReq = https.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
     }
+    proxyReq.setTimeout(6000, (data) => {
+        console.log('TIME OUT!!!!!/t' + data)
+    });
     proxyReq.url = targetURL;
     proxyReq.on('error', (err) => {
-        console.log('ERROR: ' + err)
+        console.log(err)
         clientRes.writeHead(404, 'INTERNAL ERROR')
         clientRes.end(err.toString())
     })
@@ -167,7 +170,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     if (statusCode > 300 && statusCode < 308){ // 301, 302, 303 redirect response handling
         const locationHeader = proxyRes.headers.location
         if (locationHeader) {
-            console.log('Redirecting ' + proxyReq.url + ' TO-> ' + locationHeader)
+            console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
             proxyReq.meta = clientReq.meta; 
             proxyReq.headers = clientReq.headers; // copy over the initial request headers
             // Remove all listeners (=reset events to initial state)
@@ -215,8 +218,8 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
  * @returns {Boolean}
  */
 function requestListener(req, res) {
-    console.log('->' + ' ' + req.method + ' ' + req.url);
-    res.on('finish', ()=> {console.log('<-' + res.statusCode + ' ' + req.method + ' ' + req.url);});
+    // console.log('->' + ' ' + req.method + ' ' + req.url);
+    // res.on('finish', ()=> {console.log('<-' + res.statusCode + ' ' + req.method + ' ' + req.url);});
     req.meta = { // meta data, used by the proxy
         redirectCount: 0,
         location: getCurrentUrlFromCookie(req.headers.cookie),

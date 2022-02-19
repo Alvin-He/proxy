@@ -42,8 +42,13 @@
 
         function doCORSRequest() {
             let url = document.getElementById('Url').value; 
-            document.cookie = "CURRENT_URL=" + url + "; path = '/'";
-            window.location.href = 'https://127.0.0.1:3000/';
+            let expires = new Date()
+            expires.setTime(expires.getTime() + (1*24*60*60*1000));
+            expires = "expires="+ expires.toUTCString();
+
+            document.cookie = "CURRENT_URL=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            document.cookie = "CURRENT_URL=" + url + ";" + expires + ";path = '/'";            window.location.href = 'https://cros-proxy-testing.glitch.me/'; 
+            // window.location.href = 'https://127.0.0.1:3000/'; 
             // //create callback
             // serviceWorkerFetchs[url] = (response, status) => {
             //     console.log("GET" + ' ' + url + ' ' + status);
