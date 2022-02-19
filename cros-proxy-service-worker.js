@@ -1,5 +1,5 @@
 const CROS_SERVER_ENDPOINT = "https://127.0.0.1:3000/"; //'https://cros-proxy-testing.glitch.me'
-let current_url = "";
+let CURRENT_URL = "";
 
 // Escaping a string into a regexp, https://stackoverflow.com/a/494122
 RegExp.escape = function (str) {
@@ -34,7 +34,7 @@ self.addEventListener("message", async function (event){
             
         }
         if (event.data.type == 'UPDATE_CURRENT_URL') {
-            current_url = event.data.url;
+            CURRENT_URL = event.data.url;
         };   
     }
      
@@ -50,10 +50,10 @@ async function parseHTML(htmlDocument, url) {
     let regUrl = RegExp.escape(url).split(/https?:\/\//)[1] // generates the escaped domain name
         regUrl = new RegExp(regUrl, 'guim') // generates the actual regExp
     
-    // add async to script tags so we don't get blocked for using document.write
-    for (scriptTag of htmlDocument.matchAll(/<script.*?/g)) {
-        console.log(htmlDocument.slice(0, scriptTag.index + 7) + ' async ' + htmlDocument.slice(scriptTag.index + 7))
-    }
+    // // add async to script tags so we don't get blocked for using document.write
+    // for (scriptTag of htmlDocument.matchAll(/<script.*?/g)) {
+    //     console.log(htmlDocument.slice(0, scriptTag.index + 7) + ' async ' + htmlDocument.slice(scriptTag.index + 7))
+    // }
 
     // remove any url pointing towards the proxied document's origional domain
     // and point them towards our proxy server. It's done on the client so we don't overload the server.
@@ -100,24 +100,33 @@ function newReq(request,url) {
     });
 }
 
+const localResource = [ // local resource that the client can access
+    'index.html',
+    'client.html',
+    'cros-proxy-service-worker.js'
+]
 // request handler
 async function handler(request) {
 
-    let response = await fetch(newReq(request));
-
-    if (Number(response.status) >= 400) {
-        response = await fetch(newReq(
-            request,
-            CROS_SERVER_ENDPOINT +
-            request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):3000/, current_url)
-        ));
+    let reqUrl = request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):3000\//, '')
+    for (const path of localResource) {
+        if (path == reqUrl) {
+            return await fetch(request)
+        }
     }
-    return response;
+
+    const url = request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):3000/, CURRENT_URL)
+    console.log(url)
+    return await fetch(newReq(
+        request,
+        CROS_SERVER_ENDPOINT +
+        url
+    ));
 }
 
 self.addEventListener('fetch',function (event) {
     console.log(event.request.method + ' ' + event.request.url)
-    event.respondWith(fetch(event.request))
+    event.respondWith(handler(event.request))
     // // console.log(event); 
     // if (event.request.url.match(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):8080/)) {
     //     console.log("DSR " + event.request.url);

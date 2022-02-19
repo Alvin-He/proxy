@@ -21,6 +21,7 @@ const regexp_tld = require('./lib/regexp-top-level-domain');
 const fs = require('fs');
 const localResource = [ // local resource that the client can access
     'index.html',
+    'client.html', 
     'cros-proxy-service-worker.js'
 ]
 
@@ -218,7 +219,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
  * @returns {Boolean}
  */
 function requestListener(req, res) {
-    // console.log('->' + ' ' + req.method + ' ' + req.url);
+    console.log('->' + ' ' + req.method + ' ' + req.url);
     // res.on('finish', ()=> {console.log('<-' + res.statusCode + ' ' + req.method + ' ' + req.url);});
     req.meta = { // meta data, used by the proxy
         redirectCount: 0,
@@ -291,7 +292,7 @@ function requestListener(req, res) {
         } catch (error) { // this'll fire when new URL (targetURL) errored; In case we get an invalid URL
             res.writeHead(404, 'Invalid URL');
             res.end('Invalid URL ' + targetURL);
-            console.log('Invalid URL ' + targetURL);
+            // console.log('Invalid URL ' + targetURL);
             return false;
         }
     
