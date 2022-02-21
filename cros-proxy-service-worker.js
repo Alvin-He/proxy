@@ -1,10 +1,12 @@
-const CROS_SERVER_ENDPOINT = "https://127.0.0.1:3000/"; //'https://cros-proxy-testing.glitch.me'
+const CROS_SERVER_ENDPOINT = serviceWorker.scriptURL.substring(0, serviceWorker.scriptURL.length - 28); //'https://cros-proxy-testing.glitch.me/'
 let CURRENT_URL = "";
 
 // Escaping a string into a regexp, https://stackoverflow.com/a/494122
 RegExp.escape = function (str) {
     return str.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1");
 };
+
+const REGEXP_CROS_SERVER_ENDPOINT = new RegExp(RegExp.escape(CROS_SERVER_ENDPOINT));
 
 self.addEventListener('install', function (event) {
     console.log('Service worker installed.');
@@ -14,7 +16,7 @@ self.addEventListener('install', function (event) {
 self.addEventListener("message", async function (event){
     if (event.data){
         if (event.data.type == 'FETCH_DOCUMENT'){
-            console.log(event.data.url)
+            // console.log(event.data.url)
             const url = event.data.url
             let response, status
             try {
@@ -34,8 +36,12 @@ self.addEventListener("message", async function (event){
             
         }
         if (event.data.type == 'UPDATE_CURRENT_URL') {
-            CURRENT_URL = event.data.url;
-        };   
+            if (/\/$/.test(event.data.url)) {
+                CURRENT_URL = event.data.url;
+            }else{
+                CURRENT_URL = event.data.url + '/';
+            }
+        };
     }
      
 })
@@ -90,13 +96,12 @@ async function fetchDocument (url) {
 function newReq(request,url) {
     return new Request(url ? url : request.url, {
         method: request.method, // probably the most important thing, don't want to have GET sent when we POST
-        // headers: {},
         body: request.body ? request.body : null,
         // mode: request.mode == 'navigate' ?  : request.mode,
-        // credentials: request.credentials,
-        cache: request.cache,
-        redirect: request.redirect,
-        referrer: CROS_SERVER_ENDPOINT
+        headers: request.headers,
+        mode: request.mode == 'navigate' ? 'cors' : request.mode,
+        credentials: request.credentials,
+        redirect: request.redirect
     });
 }
 
@@ -107,46 +112,50 @@ const localResource = [ // local resource that the client can access
 ]
 // request handler
 async function handler(request) {
-
-    let reqUrl = request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):3000\//, '')
-    for (const path of localResource) {
-        if (path == reqUrl) {
+    // console.log(request.url)
+    // if the server's endpoint is detected in the url
+    if (REGEXP_CROS_SERVER_ENDPOINT.test(request.url)){
+        // if we are asking for a local resource 
+        let reqUrl = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
+        for (const path of localResource) {
+            if (path == reqUrl) {
+                return await fetch(request)
+            }
+        }
+        // we might be handling a redirect passed from the server, so just pass it to the browser to handle it
+        if (!CURRENT_URL) {
             return await fetch(request)
         }
     }
+    
+    // let url // for some dammn reason, eslint.org used absolute urls when they could have just used relative. Blame them for this if statement
 
-    const url = request.url.replace(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):3000/, CURRENT_URL)
-    console.log(url)
-    return await fetch(newReq(
-        request,
-        CROS_SERVER_ENDPOINT +
-        url
-    ));
+    // if (
+    //     request.url.substring(
+    //         CROS_SERVER_ENDPOINT.length, 
+    //         CROS_SERVER_ENDPOINT.length + CURRENT_URL ) == CURRENT_URL){
+    //     url = request.url
+    // }
+    const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
+    // console.log('url: ' + url)
+    if (url.match(/https?:\/\//g).length > 2) {
+        return await fetch(newReq(
+            request,
+            request.url
+        ));
+    }else {
+        return await fetch(newReq(
+            request,
+            CROS_SERVER_ENDPOINT +
+            url
+        ));
+    }
+
+    
 }
 
 self.addEventListener('fetch',function (event) {
-    console.log(event.request.method + ' ' + event.request.url)
-    event.respondWith(handler(event.request))
-    // // console.log(event); 
-    // if (event.request.url.match(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):8080/)) {
-    //     console.log("DSR " + event.request.url);
-    //     event.respondWith(handler(event.request));
-    // } else if (event.request.url.match(/^(https?:\/\/)?((127\.0\.0\.1)|(localhost)):5500/)) {
-    //     console.log("CSR-NCROS " + event.request.url);
-
-        
-
-    //     event.respondWith(handler(event.request))
-    // }else{
-    //     console.log("Not prefixed with CROS");
-    //     // event.url = CROS_SERVER_ENDPOINT + event.url;
-    //     // console.log(event.url);
-
-        
-    //     event.respondWith(handler(event.request));
-        
-    // }
-    
-    
-    
+    // console.log(event.request.method + ' ' + event.request.url);
+    // console.log(JSON.stringify(event.request))
+    event.respondWith(handler(event.request))    
 });

@@ -1,8 +1,13 @@
 // The birthplace of Corsidium, if I can ever finish it
 // infDev
 /* TODO: 
-    Set up the proxy, 
-    support basic redirect & removeal of CORS headers, 
+    DONE Set up the proxy, 
+    DONE support basic redirect & removeal of CORS headers, 
+
+    Ya, short polling the requests don't looks like the way togo. I probably need to use
+    something like socket io, otherwise I gonna get 400s
+
+
     cookies???,
     web socket connections?! 
 
@@ -119,12 +124,19 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         headers: clientReq.headers
     }
     if (options.headers.host) {
-        options.headers.host = targetURL.hostname; 
+        // options.headers.host = targetURL.hostname; 
+        delete options.headers.host
+    }
+    if (options.headers.origin) {
+        // options.headers.origin = targetURL.origin;
+        delete options.headers.origin
     }
     if (options.headers.referer) {
-        delete options.headers.referer; 
+        // options.headers.referer = targetURL.href; 
+        delete options.headers.referer
     }
 
+    console.log(options.headers)
     // http handling
     let proxyReq
     if (options.protocol == 'http:') {
@@ -132,8 +144,9 @@ function proxyRequest(targetURL, clientReq, clientRes) {
     } else { // https handling 
         proxyReq = https.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
     }
-    proxyReq.setTimeout(6000, (data) => {
-        console.log('TIME OUT!!!!!/t' + data)
+    proxyReq.setTimeout(6000, () => {
+        console.log('TIME OUT!!!!!/t')
+        proxyReq.end(); 
     });
     proxyReq.url = targetURL;
     proxyReq.on('error', (err) => {
@@ -141,19 +154,16 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         clientRes.writeHead(404, 'INTERNAL ERROR')
         clientRes.end(err.toString())
     })
-    if (clientReq.method == 'POST') {
-        //client data handling 
-        clientReq.on('data', (chunk) => {
-            console.log(chunk.toString())
-            proxyReq.write(chunk); 
-        }); 
-        clientReq.on('end', () => {
-            proxyReq.end();
-        })
-    }else{
-        proxyReq.end()
-    }
-    
+
+    // copy over all the data, if the method has no request body and it sent a request body,
+    // we can have the end server worry about it. Proxies, after all, are just a data copier
+    clientReq.on('data', (chunk) => {
+        proxyReq.write(chunk); 
+    }); 
+    //end when the client ends the request
+    clientReq.on('end', () => {
+        proxyReq.end();
+    })
 }
 
 /**
@@ -168,47 +178,50 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     // console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
     const statusCode = proxyRes.statusCode;
 
-    if (statusCode > 300 && statusCode < 308){ // 301, 302, 303 redirect response handling
+    if (statusCode > 300 && statusCode < 308){ //redirect response handling
         const locationHeader = proxyRes.headers.location
-        if (locationHeader) {
-            console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
-            proxyReq.meta = clientReq.meta; 
-            proxyReq.headers = clientReq.headers; // copy over the initial request headers
-            // Remove all listeners (=reset events to initial state)
-            clientReq.removeAllListeners();
-            // clientReq.addListener('error')
-
-            // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
-            // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
-            // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
-            proxyReq.removeAllListeners('error');
-            proxyReq.once('error', () => {}); 
-            proxyReq.destroy(); 
-
-            proxyRequest(new URL (locationHeader), proxyReq, clientRes)
+        if (!/https:\/\/127\.0\.0\.1:3000/.test(locationHeader)){
+            proxyRes.headers.location = 'https://127.0.0.1:3000/' + locationHeader
         }
-        // clientReq.meta += '/' + locationHeader; 
-    } else{
+        // if (locationHeader) {
+        //     console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
+        //     proxyReq.meta = clientReq.meta; 
+        //     proxyReq.headers = clientReq.headers; // copy over the initial request headers
+        //     // Remove all listeners (=reset events to initial state)
+        //     clientReq.removeAllListeners();
+        //     // clientReq.addListener('error')
+            
+        //     // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
+        //     // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
+        //     // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
+        //     proxyReq.removeAllListeners('error');
+        //     proxyReq.once('error', () => {}); 
+        //     proxyReq.destroy(); 
 
-        proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
+        //     proxyRequest(new URL (locationHeader), proxyReq, clientRes)
+        //     return false
+        // }
+        // clientReq.meta += '/' + locationHeader; 
+    }else{
         proxyRes.headers['Content-Security-Policy'] = 'default-src *';
         proxyRes.headers['X-Frame-Options'] = 'SAMEORIGIN';
 
         if (proxyRes.headers['Content-Security-Policy']) {
             delete proxyRes.headers['Content-Security-Policy'];
         }
-
-        
-        clientRes.writeHead(statusCode, proxyRes.headers);
-        proxyRes.on('data', (chunk) => {
-            clientRes.write(chunk)
-            // console.log(`BODY: ${chunk}`);
-        });
-        proxyRes.on('end', () => {
-            // console.log('No more data in response.');
-            clientRes.end()
-        });
+        proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
     }
+
+    clientRes.writeHead(statusCode, proxyRes.headers);
+    proxyRes.on('data', (chunk) => {
+        clientRes.write(chunk)
+        // console.log(`BODY: ${chunk}`);
+    });
+    proxyRes.on('end', () => {
+        // console.log('No more data in response.');
+        clientRes.end()
+    });
+    
 }
 
 // Listeners
@@ -219,7 +232,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
  * @returns {Boolean}
  */
 function requestListener(req, res) {
-    console.log('->' + ' ' + req.method + ' ' + req.url);
+    // console.log('->' + ' ' + req.method + ' ' + req.url);
     // res.on('finish', ()=> {console.log('<-' + res.statusCode + ' ' + req.method + ' ' + req.url);});
     req.meta = { // meta data, used by the proxy
         redirectCount: 0,
@@ -240,7 +253,7 @@ function requestListener(req, res) {
         res.end();
         console.log('Preflight Request Responded: ' + req.url);
         return true;
-    } else if (req.method == 'GET' || req.method == 'POST') { //&& /^\/https?:/.test(req.url)
+    } else {
         let targetURL
 
         try {
@@ -295,14 +308,6 @@ function requestListener(req, res) {
             // console.log('Invalid URL ' + targetURL);
             return false;
         }
-    
-
-    // }else if(req.method === 'POST' ){
-
-    } else { // don't even know why I put this......
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('okay');
-        return false;
     }
 }
 
@@ -335,7 +340,7 @@ function connectListener(req, clientSocket, head) {
         });
     // add listeners 
     proxy.on('request', requestListener);
-    proxy.on('connect', connectListener);
+    // proxy.on('connect', connectListener);
 
     // boot the server
     proxy.listen(PORT, HOST, () => {
