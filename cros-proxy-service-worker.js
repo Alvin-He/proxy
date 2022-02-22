@@ -94,6 +94,9 @@ async function fetchDocument (url) {
 
 // loads the old request data to a new one
 function newReq(request,url) {
+    // let Jstring = '{ { "request-url":"' + url.toString() + '"}'
+    //     ',/n{ "' + key.toString() + '":"' + value.toString() + '" }'
+    // console.log(Jstring + '}')
     return new Request(url ? url : request.url, {
         method: request.method, // probably the most important thing, don't want to have GET sent when we POST
         body: request.body ? request.body : null,

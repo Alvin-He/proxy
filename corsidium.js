@@ -21,9 +21,9 @@
 const net = require('net')
 const http = require('http')
 const https = require('https')
-const { URL } = require('url')
 const regexp_tld = require('./lib/regexp-top-level-domain');
 const fs = require('fs');
+const { URL } = require('url');
 const localResource = [ // local resource that the client can access
     'index.html',
     'client.html', 
@@ -77,6 +77,18 @@ function getCurrentUrlFromCookie (cookieString) {
     }
 };
 
+// url.resolve in WHATWG URL API
+function resolve(from, to) {
+    const resolvedUrl = new URL(to, new URL(from, 'resolve://'));
+    if (resolvedUrl.protocol === 'resolve:') {
+        // `from` is a relative URL.
+        const { pathname, search, hash } = resolvedUrl;
+        return pathname + search + hash;
+    }
+    return resolvedUrl.toString();
+}
+
+
 /**
  * cors-anywhere 0.4.4 COMMIT 70aaa22 /lib/cors-anywhere.js L47-L71  
  * Adds CORS headers to the response headers.
@@ -111,6 +123,7 @@ function withCORS(headers, request) {
  * @param {http.IncomingMessage} clientReq Request sent from the client 
  * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
+let totErr = 0
 function proxyRequest(targetURL, clientReq, clientRes) {
     // console.log('Proxying: ' + targetURL)
     // clientReq.meta.location += targetURL.href; 
@@ -124,28 +137,29 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         headers: clientReq.headers
     }
     if (options.headers.host) {
-        // options.headers.host = targetURL.hostname; 
-        delete options.headers.host
+        options.headers.host = targetURL.hostname; 
+        // delete options.headers.host
     }
     if (options.headers.origin) {
-        // options.headers.origin = targetURL.origin;
-        delete options.headers.origin
+        options.headers.origin = targetURL.origin;
+        // delete options.headers.origin
     }
     if (options.headers.referer) {
-        // options.headers.referer = targetURL.href; 
-        delete options.headers.referer
+        options.headers.referer = targetURL.href; 
+        // delete options.headers.referer
     }
 
-    console.log(options.headers)
+    // console.log(options.headers)
     // http handling
     let proxyReq
     if (options.protocol == 'http:') {
-        proxyReq = http.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
+        proxyReq = http.request(options, (proxyRes) => {proxyResponse(proxyReq, proxyRes, clientReq, clientRes)});
     } else { // https handling 
-        proxyReq = https.request(options, (res) => {proxyResponse(proxyReq, res, clientReq, clientRes)});
+        proxyReq = https.request(options, (proxyRes) => {proxyResponse(proxyReq, proxyRes, clientReq, clientRes)});
     }
     proxyReq.setTimeout(6000, () => {
         console.log('TIME OUT!!!!!/t')
+        totErr += 1;
         proxyReq.end(); 
     });
     proxyReq.url = targetURL;
@@ -174,43 +188,42 @@ function proxyRequest(targetURL, clientReq, clientRes) {
  * @param {http.IncomingMessage} clientReq Request sent from the client 
  * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
+let totRedirs = 0
 function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     // console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
     const statusCode = proxyRes.statusCode;
 
-    if (statusCode > 300 && statusCode < 308){ //redirect response handling
-        const locationHeader = proxyRes.headers.location
-        if (!/https:\/\/127\.0\.0\.1:3000/.test(locationHeader)){
-            proxyRes.headers.location = 'https://127.0.0.1:3000/' + locationHeader
-        }
-        // if (locationHeader) {
-        //     console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
-        //     proxyReq.meta = clientReq.meta; 
-        //     proxyReq.headers = clientReq.headers; // copy over the initial request headers
-        //     // Remove all listeners (=reset events to initial state)
-        //     clientReq.removeAllListeners();
-        //     // clientReq.addListener('error')
+    if (statusCode >= 300 && statusCode < 400){ //redirect response handling
+        const locationHeader = resolve(proxyReq.url.href, proxyRes.headers.location)
+        if (locationHeader) {
+            console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
+            totRedirs += 1; 
+            proxyReq.meta = clientReq.meta; 
+            proxyReq.headers = clientReq.headers; // copy over the initial request headers
+            // Remove all listeners (=reset events to initial state)
+            clientReq.removeAllListeners();
+            // clientReq.addListener('error')
             
-        //     // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
-        //     // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
-        //     // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
-        //     proxyReq.removeAllListeners('error');
-        //     proxyReq.once('error', () => {}); 
-        //     proxyReq.destroy(); 
-
-        //     proxyRequest(new URL (locationHeader), proxyReq, clientRes)
-        //     return false
-        // }
-        // clientReq.meta += '/' + locationHeader; 
-    }else{
-        proxyRes.headers['Content-Security-Policy'] = 'default-src *';
-        proxyRes.headers['X-Frame-Options'] = 'SAMEORIGIN';
-
-        if (proxyRes.headers['Content-Security-Policy']) {
-            delete proxyRes.headers['Content-Security-Policy'];
+            // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
+            // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
+            // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
+            proxyReq.removeAllListeners('error');
+            proxyReq.once('error', () => {}); 
+            proxyReq.destroy(); 
+            
+            proxyRequest(new URL (locationHeader), proxyReq, clientRes)
+            return false
         }
-        proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
+        clientReq.meta += '/' + locationHeader; 
     }
+    proxyRes.headers['Content-Security-Policy'] = 'default-src *';
+    proxyRes.headers['X-Frame-Options'] = 'SAMEORIGIN';
+
+    if (proxyRes.headers['Content-Security-Policy']) {
+        delete proxyRes.headers['Content-Security-Policy'];
+    }
+    proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
+    
 
     clientRes.writeHead(statusCode, proxyRes.headers);
     proxyRes.on('data', (chunk) => {
@@ -237,10 +250,7 @@ function requestListener(req, res) {
     req.meta = { // meta data, used by the proxy
         redirectCount: 0,
         location: getCurrentUrlFromCookie(req.headers.cookie),
-        // baseURL : (
-        //     (   (req.connection.encrypted || /^\s*https/.test(req.headers['x-forwarded-proto'])) ? 
-        //     'https' : 'http') + '//' + req.headers.host
-        // ), 
+        // baseURL : ''
 
     };
 
