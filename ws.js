@@ -1,5 +1,55 @@
 // WebSocket API overwrite 
 
+if ('serviceWorker' in navigator) {
+    // window.addEventListener('load', function () {
+    navigator.serviceWorker.register('ws.sw.js').then(function (registration) {
+        // Registration was successful
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        return;
+    }, function (err) {
+        // registration failed :(
+        console.log('ServiceWorker registration failed: ', err);
+        return err;
+    });
+    // });
+}
+
+const sw = navigator.serviceWorker
+
+sw.addEventListener('message', (event) => {
+    if (event.data) {
+        const data = event.data
+        if (data.type == 'WEB_SOCKET_INIT') {
+            console.log('status: ' + data.status + '\nSocket Information:');
+            console.log(data.socket)
+
+        }else if (data.type == 'WEB_SOCKET_message') {
+            console.log('Socket Message ID: ' + data.id)
+            console.log(data.event)
+
+        }else if (data.type == 'WEB_SOCKET_open') {
+            console.log('Socket Open ID: ' + data.id)
+
+        }else if (data.type == 'WEB_SOCKET_error') {
+            console.log('Socket Error ID: ' + data.id)
+
+        }else if (data.type == 'WEB_SOCKET_close') {
+
+            console.log('Socket Close ID: ' + data.id)
+            console.log(data.event)
+        }
+    }
+    
+})
+
+sw.controller.postMessage({
+    type: 'WEB_SOCKET_INIT',
+    url: 'wss://example.com/socketserver',
+    id: 10,
+})
+
+
+
 /**
  * Notes:
  * 
@@ -8,7 +58,9 @@
  *  2: change the entire class, point every thing towards service worker, and let it handle the traffic 
  */
 
-const old_WebSocket = Object.assign({}, WebSocket);
+
+let old_WebSocket = new Object
+Object.assign(old_WebSocket, WebSocket);
 
 const preSets = {
     binaryType: {
@@ -27,16 +79,58 @@ const preSets = {
     // url: aWebSocket.url : DOMString
 }
 
-class ws {
+let currentID = 0
+class ws extends EventTarget {
     constructor(url, protocols) {
-        this.sock = old_WebSocket(url, protocols)
+        super()
+
+        this.SOCKET_IDENTIFIER = ++currentID
+
+        // Service Worker SYN
+        sw.controller.postMessage({
+            type: 'WEB_SOCKET_INIT',
+            url: url,
+            protocols: protocols ? protocols : undefined,
+            id: SOCKET_IDENTIFIER,
+        })
+        sw.addEventListener('message', (event) => {
+            if (event.data && event.data.id == this.SOCKET_IDENTIFIER) {
+                const data = event.data
+                if (data.type == 'WEB_SOCKET_INIT') {
+                    console.log('status: ' + data.status + '\nSocket Information:');
+                    console.log(data.socket)
+                    // for (property in data.socket) {
+
+                    // }
+
+                } else if (data.type == 'WEB_SOCKET_message') {
+                    console.log('Socket Message ID: ' + data.id)
+                    console.log(data.event)
+
+                } else if (data.type == 'WEB_SOCKET_open') {
+                    console.log('Socket Open ID: ' + data.id)
+
+                } else if (data.type == 'WEB_SOCKET_error') {
+                    console.log('Socket Error ID: ' + data.id)
+
+                } else if (data.type == 'WEB_SOCKET_close') {
+
+                    console.log('Socket Close ID: ' + data.id)
+                    console.log(data.event)
+                }
+            }
+
+        })
+
+        // WebSocket properties
+        this.binaryType = socket.binaryType
+        this.bufferedAmount = socket.bufferedAmount
+        this.extensions = socket.extensions
+        this.protocol = socket.protocol
+        this.readyState = socket.readyState
+        this.url = socket.url
+
         return this
-        // this.binaryType = "blob", "arraybuffer"; 
-        // this.bufferedAmount = 0; 
-        // this.extensions = ''; 
-        // this.protocols = ''; 
-        // this.readyState = preSets.readyState.CONNECTING; 
-        // this.url = ''; 
     }
     send(data) {
         console.log(data); 
