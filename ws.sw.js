@@ -24,13 +24,15 @@ self.addEventListener('message', (event) => {
             console.log('WEB_SOCKET_INIT')
             let socket
             try {
-                socket = new WebSocket(event.data.url, event.data.protocols); 
+                if (webSockets[id] != undefined) { throw 'Web socket with id: ' + id + 'already exist.'}
+                socket = socket[id] = new WebSocket(event.data.url, event.data.protocols); 
                 socket.onopen = () => {
                     client.postMessage({
                         type: 'WEB_SOCKET_open',
                         id: id
                     })
                 }
+
                 socket.onmessage = (event) => {
                     client.postMessage({
                         type: 'WEB_SOCKET_message',
@@ -44,6 +46,7 @@ self.addEventListener('message', (event) => {
                         }
                     })
                 }
+                
                 socket.onclose = (event) => {
                     client.postMessage({
                         type: 'WEB_SOCKET_close',
@@ -55,34 +58,42 @@ self.addEventListener('message', (event) => {
                         }
                     })
                 }
+
                 socket.onerror = () => {
                     client.postMessage({
                         type: 'WEB_SOCKET_error',
                         id: id
                     })
                 }
+
+                client.postMessage({
+                    type: 'WEB_SOCKET_INIT',
+                    status: 'ok',
+                    socket: {
+                        binaryType: socket.binaryType,
+                        bufferedAmount: socket.bufferedAmount,
+                        extensions: socket.extensions,
+                        protocol: socket.protocol,
+                        readyState: socket.readyState,
+                        url: socket.url
+                    }
+                });
             } catch (error) {
                 client.postMessage({
                     type: 'WEB_SOCKET_INIT',
                     status: 'failed',
-                    error: error
+                    error: error.toString()
                 });
             }
-            client.postMessage({
-                type: 'WEB_SOCKET_INIT',
-                status: 'ok',
-                socket: {
-                    binaryType: socket.binaryType,
-                    bufferedAmount: socket.bufferedAmount,
-                    extensions: socket.extensions,
-                    protocol: socket.protocol,
-                    readyState: socket.readyState,
-                    url: socket.url
-                }
-            });
 
+        }else if (event.data.type == 'WEB_SOCKET_send') {
+            webSockets[event.data.id].send(event.data.data);
             
-            
+        }else if (event.data.type == 'WEB_SOCKET_close') {
+            webSockets[event.data.id].close(
+                event.data.code ? event.data.code : undefined, 
+                event.data.reason ? event.data.reason : undefined
+            )
         }
     }
 })

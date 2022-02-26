@@ -72,66 +72,89 @@ const preSets = {
         OPEN: 1, 
         CLOSING: 2, 
         CLOSED: 3
-    }
-    // bufferedAmount: 0 : unsigned long
-    // extensions: aWebSocket.extensions : DOMString
-    // protocols: aWebSocket.protocol : DOMString
-    // url: aWebSocket.url : DOMString
+    },
+    bufferedAmount: 0,  // : unsigned long
+    extensions: '',     // aWebSocket.extensions : DOMString
+    protocols: '',      // aWebSocket.protocol : DOMString
+    url: '',            // aWebSocket.url : DOMString
 }
 
 let currentID = 0
 class ws extends EventTarget {
     constructor(url, protocols) {
-        super()
+        super() // EventTarget initialization 
 
+        // proxy defined properties
         this.SOCKET_IDENTIFIER = ++currentID
 
-        // Service Worker SYN
+        // WebSocket properties
+        this.binaryType = preSets.binaryType.blob
+        this.bufferedAmount = preSets.bufferedAmount
+        this.extensions = preSets.extensions
+        this.protocol = preSets.protocols
+        this.readyState = preSets.readyState.CONNECTING
+        this.url = preSets.url
+
+        sw.addEventListener('message', (event) => {
+            if (event.data && event.data.id == this.SOCKET_IDENTIFIER) {
+                const data = event.data
+                if (data.type == 'WEB_SOCKET_INIT') {
+                    console.log('status: ' + data.status + '\nSocket Information:');
+                    if (data.status == 'ok') {
+                        console.log(data.socket); 
+                        // copy the data from the sw to this object 
+                        for (property in data.socket) {
+                            this[property] = data.socket[property];
+                        }
+                    }else{
+                        console.log(data.error)
+                    }
+                    
+
+                } else if (data.type == 'WEB_SOCKET_message') {
+                    console.log('Socket Message ID: ' + data.id)
+                    console.log(data.event)
+                    this.dispatchEvent(new MessageEvent('message', {
+                        data: data.event.data, 
+                        origin: event.data.origin, 
+                        lastEventId: data.event.lastEventId, 
+                        source: window
+                    }))
+
+                } else if (data.type == 'WEB_SOCKET_open') {
+                    console.log('Socket Open ID: ' + data.id)
+                    this.dispatchEvent(new Event('open'))
+
+                } else if (data.type == 'WEB_SOCKET_error') {
+                    console.log('Socket Error ID: ' + data.id)
+                    this.dispatchEvent(new Event('error')); 
+
+                } else if (data.type == 'WEB_SOCKET_close') {
+                    console.log('Socket Close ID: ' + data.id)
+                    console.log(data.event)
+                    this.dispatchEvent(new CloseEvent('close', {
+                        wasClean: data.event.wasClean, 
+                        code: data.event.code, 
+                        reason: data.event.reason
+                    })); 
+
+                }
+            }
+        });
+
+        // Send Service Worker SYN
         sw.controller.postMessage({
             type: 'WEB_SOCKET_INIT',
             url: url,
             protocols: protocols ? protocols : undefined,
             id: SOCKET_IDENTIFIER,
         })
-        sw.addEventListener('message', (event) => {
-            if (event.data && event.data.id == this.SOCKET_IDENTIFIER) {
-                const data = event.data
-                if (data.type == 'WEB_SOCKET_INIT') {
-                    console.log('status: ' + data.status + '\nSocket Information:');
-                    console.log(data.socket)
-                    // for (property in data.socket) {
-
-                    // }
-
-                } else if (data.type == 'WEB_SOCKET_message') {
-                    console.log('Socket Message ID: ' + data.id)
-                    console.log(data.event)
-
-                } else if (data.type == 'WEB_SOCKET_open') {
-                    console.log('Socket Open ID: ' + data.id)
-
-                } else if (data.type == 'WEB_SOCKET_error') {
-                    console.log('Socket Error ID: ' + data.id)
-
-                } else if (data.type == 'WEB_SOCKET_close') {
-
-                    console.log('Socket Close ID: ' + data.id)
-                    console.log(data.event)
-                }
-            }
-
-        })
-
-        // WebSocket properties
-        this.binaryType = socket.binaryType
-        this.bufferedAmount = socket.bufferedAmount
-        this.extensions = socket.extensions
-        this.protocol = socket.protocol
-        this.readyState = socket.readyState
-        this.url = socket.url
+        
+        
 
         return this
     }
+    
     send(data) {
         console.log(data); 
         this.sock.send(data); 
