@@ -90,10 +90,7 @@ self.addEventListener('message', (event) => {
             webSockets[event.data.id].send(event.data.data);
             
         }else if (event.data.type == 'WEB_SOCKET_close') {
-            webSockets[event.data.id].close(
-                event.data.code ? event.data.code : undefined, 
-                event.data.reason ? event.data.reason : undefined
-            )
+            webSockets[event.data.id].close(event.data.code, event.data.reason);
         }
     }
 })

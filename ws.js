@@ -94,6 +94,7 @@ class ws extends EventTarget {
         this.protocol = preSets.protocols
         this.readyState = preSets.readyState.CONNECTING
         this.url = preSets.url
+        this.onclose; this.onopen; this.onerror; this.onmessage
 
         sw.addEventListener('message', (event) => {
             if (event.data && event.data.id == this.SOCKET_IDENTIFIER) {
@@ -157,12 +158,18 @@ class ws extends EventTarget {
     
     send(data) {
         console.log(data); 
-        this.sock.send(data); 
+        sw.controller.postMessage({
+            type: 'WEB_SOCKET_send', 
+            data: data
+        })
     }
     close(code, reason) {
-        code = code ? code : 1000; 
         console.log(code, reason); 
-        this.sock.close(code, reason); 
+        sw.controller.postMessage({
+            type: 'WEB_SOCKET_close',
+            code: code ? code : 1000, 
+            reason: reason ? reason : undefined
+        })
     }
 }
 

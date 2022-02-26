@@ -321,20 +321,6 @@ function requestListener(req, res) {
     }
 }
 
-function connectListener(req, clientSocket, head) {
-    // Connect to an origin server
-    const { port, hostname } = new URL(`http://${req.url}`);
-    const serverSocket = net.connect(port || 80, hostname, () => {
-        clientSocket.write('HTTP/1.1 200 Connection Established\r\n' +
-            'Proxy-agent: Node.js-Proxy\r\n' +
-            '\r\n');
-        console.log(head);
-        serverSocket.write(head);
-        serverSocket.pipe(clientSocket);
-        clientSocket.pipe(serverSocket);
-    });
-}
-
 // Async calls 
 (async ()=> {
     // initiation 
@@ -351,7 +337,6 @@ function connectListener(req, clientSocket, head) {
         
     // add listeners 
     proxy.on('request', requestListener);
-    // proxy.on('connect', connectListener);
 
     // boot the server
     proxy.listen(PORT, HOST, () => {
