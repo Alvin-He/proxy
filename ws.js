@@ -16,37 +16,37 @@ if ('serviceWorker' in navigator) {
 
 const sw = navigator.serviceWorker
 
-sw.addEventListener('message', (event) => {
-    if (event.data) {
-        const data = event.data
-        if (data.type == 'WEB_SOCKET_INIT') {
-            console.log('status: ' + data.status + '\nSocket Information:');
-            console.log(data.socket)
+// sw.addEventListener('message', (event) => {
+//     if (event.data) {
+//         const data = event.data
+//         if (data.type == 'WEB_SOCKET_INIT') {
+//             console.log('status: ' + data.status + '\nSocket Information:');
+//             console.log(data.socket)
 
-        }else if (data.type == 'WEB_SOCKET_message') {
-            console.log('Socket Message ID: ' + data.id)
-            console.log(data.event)
+//         }else if (data.type == 'WEB_SOCKET_message') {
+//             console.log('Socket Message ID: ' + data.id)
+//             console.log(data.event)
 
-        }else if (data.type == 'WEB_SOCKET_open') {
-            console.log('Socket Open ID: ' + data.id)
+//         }else if (data.type == 'WEB_SOCKET_open') {
+//             console.log('Socket Open ID: ' + data.id)
 
-        }else if (data.type == 'WEB_SOCKET_error') {
-            console.log('Socket Error ID: ' + data.id)
+//         }else if (data.type == 'WEB_SOCKET_error') {
+//             console.log('Socket Error ID: ' + data.id)
 
-        }else if (data.type == 'WEB_SOCKET_close') {
+//         }else if (data.type == 'WEB_SOCKET_close') {
 
-            console.log('Socket Close ID: ' + data.id)
-            console.log(data.event)
-        }
-    }
+//             console.log('Socket Close ID: ' + data.id)
+//             console.log(data.event)
+//         }
+//     }
     
-})
+// })
 
-sw.controller.postMessage({
-    type: 'WEB_SOCKET_INIT',
-    url: 'wss://example.com/socketserver',
-    id: 10,
-})
+// sw.controller.postMessage({
+//     type: 'WEB_SOCKET_INIT',
+//     url: 'wss://example.com/socketserver',
+//     id: 10,
+// })
 
 
 
@@ -148,7 +148,7 @@ class ws extends EventTarget {
             type: 'WEB_SOCKET_INIT',
             url: url,
             protocols: protocols ? protocols : undefined,
-            id: SOCKET_IDENTIFIER,
+            id: this.SOCKET_IDENTIFIER,
         })
         
         
@@ -160,6 +160,7 @@ class ws extends EventTarget {
         console.log(data); 
         sw.controller.postMessage({
             type: 'WEB_SOCKET_send', 
+            id: this.SOCKET_IDENTIFIER,
             data: data
         })
     }
@@ -167,6 +168,7 @@ class ws extends EventTarget {
         console.log(code, reason); 
         sw.controller.postMessage({
             type: 'WEB_SOCKET_close',
+            id: this.SOCKET_IDENTIFIER,
             code: code ? code : 1000, 
             reason: reason ? reason : undefined
         })
