@@ -1,5 +1,5 @@
 
-const xxx = 'xx'; 
+const clientUUID = 'undefined!undefined!undefined!undefined!'; 
 
 // class ws extends WebSocket {
 //     constructor(url, protocols) {
@@ -13,7 +13,18 @@ self.addEventListener('install', function (event) {
     self.skipWaiting();
 });
 
-let webSockets = {}
+async function generateIdentifier(host, origin) {
+    // conbine host and origin into a single byte array, so we can hash them 
+    const data = new TextEncoder().encode(host + origin); 
+    // the hash in SHA-1 (you could use SHA-256, but it's just a UUID, so no need to make it too secure)
+    const hash = await crypto.subtle.digest('SHA-1', data) 
+    const hashArray = Array.from(new Uint8Array(hash)); // converts into Uint8Array 
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join(''); // converts to hex 
+
+    return 'LCPP-' + hashHex + '-' + Number(new Date) + '-' + clientUUID + '-CROS'
+}
+
+// function
 
 
 self.addEventListener('message', (event) => {
@@ -22,10 +33,10 @@ self.addEventListener('message', (event) => {
         const id = event.data.id; 
         if (event.data.type == 'WEB_SOCKET_INIT') {
             console.log('WEB_SOCKET_INIT')
-            let socket
+            let socket 
             try {
                 if (webSockets[id] != undefined) { throw 'Web socket with id: ' + id + 'already exist.'}
-                socket = socket[id] = new WebSocket(event.data.url, event.data.protocols); 
+                socket = webSockets[id] = new WebSocket(event.data.url, event.data.protocols); 
                 socket.onopen = () => {
                     client.postMessage({
                         type: 'WEB_SOCKET_open',
