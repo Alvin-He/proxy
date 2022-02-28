@@ -16,39 +16,6 @@ if ('serviceWorker' in navigator) {
 
 const sw = navigator.serviceWorker
 
-// sw.addEventListener('message', (event) => {
-//     if (event.data) {
-//         const data = event.data
-//         if (data.type == 'WEB_SOCKET_INIT') {
-//             console.log('status: ' + data.status + '\nSocket Information:');
-//             console.log(data.socket)
-
-//         }else if (data.type == 'WEB_SOCKET_message') {
-//             console.log('Socket Message ID: ' + data.id)
-//             console.log(data.event)
-
-//         }else if (data.type == 'WEB_SOCKET_open') {
-//             console.log('Socket Open ID: ' + data.id)
-
-//         }else if (data.type == 'WEB_SOCKET_error') {
-//             console.log('Socket Error ID: ' + data.id)
-
-//         }else if (data.type == 'WEB_SOCKET_close') {
-
-//             console.log('Socket Close ID: ' + data.id)
-//             console.log(data.event)
-//         }
-//     }
-    
-// })
-
-// sw.controller.postMessage({
-//     type: 'WEB_SOCKET_INIT',
-//     url: 'wss://example.com/socketserver',
-//     id: 10,
-// })
-
-
 
 /**
  * Notes:
@@ -95,6 +62,11 @@ class ws extends EventTarget {
         this.readyState = preSets.readyState.CONNECTING
         this.url = preSets.url
         this.onclose; this.onopen; this.onerror; this.onmessage
+
+        this.CONNECTING = 0
+        this.OPEN = 1
+        this.CLOSING = 2,
+        this.CLOSED = 3
 
         sw.addEventListener('message', (event) => {
             if (event.data && event.data.id == this.SOCKET_IDENTIFIER) {
@@ -175,29 +147,3 @@ class ws extends EventTarget {
     }
 }
 
-function socket_send() {
-
-}
-
-function socket_close() {
-
-}
-// let sock = new WebSocket('wss://www.example.com/socketserver')
-// console.log(sock)
-
-
-
-let close = new CloseEvent('close', {
-    wasClean: false, 
-    code: false, 
-    reason: false
-}); 
-
-let error = new Event('error'); 
-let message = new MessageEvent('messsage', {
-    data: '', 
-    origin: '', 
-    lastEventId: '', 
-    source: window, 
-})
-let open = new Event('open');

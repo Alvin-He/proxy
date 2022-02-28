@@ -1,4 +1,4 @@
-
+const CROS_SERVER_ENDPOINT = 'wss://127.0.0.1:5000/' //'https://cros-proxy-testing.glitch.me/'
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
 
 // class ws extends WebSocket {
@@ -13,6 +13,7 @@ self.addEventListener('install', function (event) {
     self.skipWaiting();
 });
 
+// generates an identifier in the form of LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
 async function generateIdentifier(host, origin) {
     // conbine host and origin into a single byte array, so we can hash them 
     const data = new TextEncoder().encode(host + origin); 
@@ -24,19 +25,46 @@ async function generateIdentifier(host, origin) {
     return 'LCPP-' + hashHex + '-' + Number(new Date) + '-' + clientUUID + '-CROS'
 }
 
-// function
+async function notifyServer(identifier, url) {
+    const req = new Request('https://127.0.0.1:5000/LCPP', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            identifier: identifier,
+            target: url
+        })
+    })
+
+    let res = await fetch(req)
+    if (res.status == 201) { // if the server accepted the request
+        return true;
+    }else{ // if the server rejected the request, signal error to the client
+        throw 'internal service worker error'
+    }
+
+}
 
 
-self.addEventListener('message', (event) => {
+let webSockets = {};
+
+self.addEventListener('message', async (event) => {
     if (event.data) {
         const client = event.source; 
         const id = event.data.id; 
         if (event.data.type == 'WEB_SOCKET_INIT') {
             console.log('WEB_SOCKET_INIT')
-            let socket 
             try {
                 if (webSockets[id] != undefined) { throw 'Web socket with id: ' + id + 'already exist.'}
-                socket = webSockets[id] = new WebSocket(event.data.url, event.data.protocols); 
+                // generate the identifier
+                let {host, origin, href} = new URL(event.data.url);
+                const identifier = await generateIdentifier(host, origin);
+                // set the target url pointing to our endpoint and send the websocket
+                const targetUrl = CROS_SERVER_ENDPOINT + identifier + '/' + href;
+                const socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols); 
+
+                // listeners
                 socket.onopen = () => {
                     client.postMessage({
                         type: 'WEB_SOCKET_open',
@@ -86,10 +114,11 @@ self.addEventListener('message', (event) => {
                         extensions: socket.extensions,
                         protocol: socket.protocol,
                         readyState: socket.readyState,
-                        url: socket.url
+                        url: event.data.url
                     }
                 });
             } catch (error) {
+                console.log(error);
                 client.postMessage({
                     type: 'WEB_SOCKET_INIT',
                     status: 'failed',
