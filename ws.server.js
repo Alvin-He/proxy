@@ -45,8 +45,6 @@ function abortHandshake(socket, code, message, headers) {
             message
         );
     }
-
-    socket.removeListener('error', socketOnError);
     socket.destroy();
 }
 
@@ -83,37 +81,51 @@ function upgradeListener(req, clientSocket, head) {
     const url = path.join('/'); // the target url
 
     // LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
-    if (/^LCPP-.*-\d*-.*-CROS$/.test(identifier)) { 
+    if (/^LCPP-.*-\d*-.*-CROS$/.test(identifier)) {
         const identifierArray = identifier.split('-');
         const hash = identifierArray[1];
         const time = identifierArray[2];
         const uuid = identifierArray[3];
         if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
             const requestInfo = SERVER_GLOBAL.LCPP[hash];
-            const target = requestInfo[2];
+            const target = new URL(requestInfo[2]);
             const client = requestInfo[0];
             // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
             if (client === uuid && Number(new Date()) - Number(time) <60000 ) { // id and time out 
                 console.log('LCPP-OK')
-            }
+                const proxyReq = net.connect(target.port || 80, target.hostname, (socket) => {
+                    
+                    // TODO: generate a websocket upgrade request since we already used it
+                    
+                    socket.write(head); 
+                    socket.pipe(clientSocket); 
+                    clientSocket.pipe(socket);
+                });
+                proxyReq.on('close', () => {
+                    clientSocket.destroy();
+                });
+                clientSocket.on('close', () => {
+                    proxyReq.destroy();
+                });
+        }   }   
     }else{
         abortHandshake(clientSocket, 400)
     }
 
-    const key = req.headers['sec-websocket-key'] ? req.headers['sec-websocket-key'] : abortHandshake(clientSocket, 400)
+    // const key = req.headers['sec-websocket-key'] ? req.headers['sec-websocket-key'] : abortHandshake(clientSocket, 400)
 
-    const digest = createHash('sha1').update(key + WS_GUID).digest('base64')
+    // const digest = createHash('sha1').update(key + WS_GUID).digest('base64')
 
-    clientSocket.write(
-    'HTTP/1.1 101 Switching Protocols\r\n' +
-    'Upgrade: websocket\r\n' + 
-    'Connection: Upgrade\r\n' + 
-    'Sec-WebSocket-Accept: ' + digest + '\r\n' +
-    '\r\n');
+    // clientSocket.write(
+    // 'HTTP/1.1 101 Switching Protocols\r\n' +
+    // 'Upgrade: websocket\r\n' + 
+    // 'Connection: Upgrade\r\n' + 
+    // 'Sec-WebSocket-Accept: ' + digest + '\r\n' +
+    // '\r\n');
 
-    clientSocket.on('data', (buffer) => {
-        console.log(buffer.readBigUInt64LE())
-    })
+    // clientSocket.on('data', (buffer) => {
+    //     console.log(buffer.readBigUInt64LE())
+    // })
 }
 
 /**
