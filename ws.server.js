@@ -21,7 +21,7 @@ const PORT = process.env.PORT || 5000
 let DIR_PATH = new Promise((resolve, reject) => { fs.access('./corsidium.js', (err) => { if (err) { DIR_PATH = 'proxy/'; } else { DIR_PATH = './'; } resolve(); }); });
 
 let SERVER_GLOBAL = {
-    LCPP: { // hash : [client, target url, server unix time stamp]
+    LCPP: { // hash : [client, target url, origin url, server unix time stamp]
 
     },
 }
@@ -73,7 +73,7 @@ function upgradeListener(req, clientSocket, head) {
     console.log('upgrade');
     console.log(req.url)
     console.log(req.headers) 
-    console.log(head.toString('utf8'))
+    console.log(head.toString())
 
     // extract the identifier from the request url
     let path = req.url.substring(1).split('/');
@@ -88,18 +88,29 @@ function upgradeListener(req, clientSocket, head) {
         const uuid = identifierArray[3];
         if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
             const requestInfo = SERVER_GLOBAL.LCPP[hash];
-            const target = new URL(requestInfo[2]);
             const client = requestInfo[0];
+            const target = new URL(requestInfo[1]);
+            const origin = new URL(requestInfo[2]);
+            const port = target.port || ( /s:$/.test(target.protocol) ? 443 : 80);
             // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
-            if (client === uuid && Number(new Date()) - Number(time) <60000 ) { // id and time out 
+            if (client === uuid && Number(new Date()) - requestInfo[3] < 60000 ) { // id and time out 
                 console.log('LCPP-OK')
-                const proxyReq = net.connect(target.port || 80, target.hostname, (socket) => {
+                delete SERVER_GLOBAL.LCPP[hash]; // free memory 
+                const proxyReq = net.connect(port, target.hostname, (socket) => {
                     
                     // TODO: generate a websocket upgrade request since we already used it
-                    
-                    socket.write(head); 
-                    socket.pipe(clientSocket); 
-                    clientSocket.pipe(socket);
+                    let headers = req.headers;
+                    headers.Host = target.hostname; // change host to the target host
+                    headers.origin = origin; // change origin to the target origin
+
+                    socket.write('HTTP/1.1 101 Switching Protocols\r\n'); // let the server know we are upgrading
+                    headers.forEach((value, key) => {
+                        socket.write(`${key}: ${value}\r\n`);
+                    });
+                    socket.write('\r\n'); // end of headers
+                    socket.write(head); // write the request body from the client 
+                    socket.pipe(clientSocket); // pipe the client socket to the server socket
+                    clientSocket.pipe(socket); // pipe the server socket to the client socket
                 });
                 proxyReq.on('close', () => {
                     clientSocket.destroy();

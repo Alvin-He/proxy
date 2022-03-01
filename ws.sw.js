@@ -1,5 +1,6 @@
 const CROS_SERVER_ENDPOINT = 'wss://127.0.0.1:5000/' //'https://cros-proxy-testing.glitch.me/'
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
+const currentURL = 'https://discord.com';
 
 // class ws extends WebSocket {
 //     constructor(url, protocols) {
@@ -25,7 +26,8 @@ async function generateIdentifier(host, origin) {
     return 'LCPP-' + hashHex + '-' + Number(new Date) + '-' + clientUUID + '-CROS'
 }
 
-async function notifyServer(identifier, url) {
+// ya, we're definely gonna switch to socket io afterwards .......
+async function notifyServer(identifier, target) {
     const req = new Request('https://127.0.0.1:5000/LCPP', {
         method: 'POST',
         headers: {
@@ -33,7 +35,8 @@ async function notifyServer(identifier, url) {
         },
         body: JSON.stringify({
             identifier: identifier,
-            target: url
+            origin: currentURL,
+            target: target
         })
     })
 
