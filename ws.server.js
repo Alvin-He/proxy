@@ -96,8 +96,16 @@ function upgradeListener(req, clientSocket, head) {
                 const proxyReq = net.connect(target.port || 80, target.hostname, (socket) => {
                     
                     // TODO: generate a websocket upgrade request since we already used it
-                    
-                    socket.write(head); 
+                    let headers = req.headers;
+                    headers.Host = target.hostname; // change host to the target host
+                    headers.origin = origin; // change origin to the target origin
+
+                    socket.write('HTTP/1.1 101 Switching Protocols\r\n'); // let the server know we are upgrading
+                    headers.forEach((value, key) => {
+                        socket.write(`${key}: ${value}\r\n`);
+                    });
+                    socket.write('\r\n'); // end of headers
+                    socket.write(head); // write the request body from the client 
                     socket.pipe(clientSocket); 
                     clientSocket.pipe(socket);
                 });

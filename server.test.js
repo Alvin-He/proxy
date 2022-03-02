@@ -349,10 +349,10 @@ function requestListener(req, res) {
  * @param {net.Socket} clientSocket 
  * @param {Buffer} head 
  */
- function upgradeListener(req, clientSocket, head) {
+function upgradeListener(req, clientSocket, head) {
     console.log('upgrade');
     console.log(req.url)
-    console.log(req.headers) 
+    console.log(req.headers)
     console.log(head.toString('utf8'))
 
     // extract the identifier from the request url
@@ -371,14 +371,22 @@ function requestListener(req, res) {
             const target = new URL(requestInfo[2]);
             const client = requestInfo[0];
             // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
-            if (client === uuid && Number(new Date()) - Number(time) <60000 ) { // id and time out 
+            if (client === uuid && Number(new Date()) - Number(time) < 60000) { // id and time out 
                 console.log('LCPP-OK')
                 const proxyReq = net.connect(target.port || 80, target.hostname, (socket) => {
-                    
+
                     // TODO: generate a websocket upgrade request since we already used it
-                    
-                    socket.write(head); 
-                    socket.pipe(clientSocket); 
+                    let headers = req.headers;
+                    headers.Host = target.hostname; // change host to the target host
+                    headers.origin = origin; // change origin to the target origin
+
+                    socket.write('HTTP/1.1 101 Switching Protocols\r\n'); // let the server know we are upgrading
+                    headers.forEach((value, key) => {
+                        socket.write(`${key}: ${value}\r\n`);
+                    });
+                    socket.write('\r\n'); // end of headers
+                    socket.write(head); // write the request body from the client 
+                    socket.pipe(clientSocket);
                     clientSocket.pipe(socket);
                 });
                 proxyReq.on('close', () => {
@@ -387,8 +395,9 @@ function requestListener(req, res) {
                 clientSocket.on('close', () => {
                     proxyReq.destroy();
                 });
-        }   }   
-    }else{
+            }
+        }
+    } else {
         abortHandshake(clientSocket, 400)
     }
 
@@ -407,7 +416,6 @@ function requestListener(req, res) {
     //     console.log(buffer.readBigUInt64LE())
     // })
 }
-
 
 // Async calls 
 (async ()=> {
