@@ -64,9 +64,11 @@ self.addEventListener('message', async (event) => {
                 let {host, origin, href} = new URL(event.data.url);
                 const identifier = await generateIdentifier(host, origin);
                 // set the target url pointing to our endpoint and send the websocket
-                const targetUrl = CROS_SERVER_ENDPOINT + identifier + '/' + href;
+                const targetUrl = CROS_SERVER_ENDPOINT + identifier;
                 const socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols); 
+                if (await notifyServer(identifier, event.data.url)) {
 
+                }
                 // listeners
                 socket.onopen = () => {
                     client.postMessage({
