@@ -275,7 +275,7 @@ async function handler(request) {
             url
         ));
     }
-
+ 
     if (response && response.headers.get('content-type') == 'text/html') {
         return await parseHTML(await response.text())
     }else{
