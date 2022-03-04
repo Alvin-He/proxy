@@ -171,10 +171,24 @@ async function notifyServer(identifier, target) {
  * @param {String} url 
  * @returns 
  */
-async function parseHTML(htmlDocument, url) {
+async function parseHTML(htmlDocument) {
     const buffer = new Array(6); 
     const notMatched = true; 
+    for (let i = 0; i < 6; i++) {
+        buffer[i] = htmlDocument[i];
+    }// fill the buffer
 
+    for (let i = 0; i < htmlDocument.length; i++) {
+        if (buffer.join('') == '<head>') { // check if we found the header we wanted
+            // insert at the next length 
+            htmlDocument = htmlDocument.slice(0, i) + 
+            '<script type="text/jsvascript" src="ws.sw.js">' +
+            htmlDocument.slice(i); 
+            break;
+        }
+        buffer.shift(); // remove the previous char
+        buffer[6] = htmlDocument[i]; // insert the new char
+    }
     return htmlDocument
 }
 
@@ -247,20 +261,26 @@ async function handler(request) {
     //     url = request.url
     // }
     const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
-    // console.log('url: ' + url)
+    
+    let response
     if (url.match(/https?:\/\//g).length > 2) {
-        return await fetch(newReq(
+        response = await fetch(newReq(
             request,
             request.url
         ));
     }else {
-        return await fetch(newReq(
+        response = await fetch(newReq(
             request,
             CROS_SERVER_ENDPOINT +
             url
         ));
     }
 
+    if (response && response.headers.get('content-type') == 'text/html') {
+        return await parseHTML(await response.text())
+    }else{
+        return response;
+    }
     
 }
 
