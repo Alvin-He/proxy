@@ -4,14 +4,15 @@
 const net = require('net')
 const http = require('http')
 const https = require('https')
-const regexp_tld = require('./lib/regexp-top-level-domain');
+const regexp_tld = require('../lib/regexp-top-level-domain');
 const fs = require('fs');
 const { URL } = require('url');
 const { createHash } = require('crypto');
 const localResource = [ // local resource that the client can access
-    'index.html',
-    'client.html', 
-    'cros-proxy-service-worker.js'
+    'ws.js',
+    'index.test.js',
+    'test.html', 
+    'sw.test.js'
 ]
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
@@ -19,18 +20,18 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const ENGINE = process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS ? 'GLITCH' : process.env.XDG_CONFIG_HOME ? 'REPLIT' : 'NATIVE'
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
-let DIR_PATH = new Promise((resolve, reject) => {fs.access('./corsidium.js',(err)=>{if(err){DIR_PATH = 'proxy/';}else{DIR_PATH='./';}resolve();});});
- 
+const DIR_PATH = ENGINE == 'NATIVE' ? './' : './proxy/';
+
 const CROS_MAX_AGE = 0
 
-let SERVER_GLOBAL = {
-    LCPP: { // hash : [client, target url, server unix time stamp]
+let SERVER_GLOBAL = {//  0   ,     1     ,      2    ,            3 
+    LCPP: { // hash : [client, origin url, target url, server unix time stamp]
 
     },
 }
 
 function localServerResponse(path, clientRes) {
-    console.log("Local Resource Request: " + path); 
+    // console.log("Local Resource Request: " + path); 
     fs.readFile(DIR_PATH + path, 'utf8', function(error, data) {
         if (error) {
             console.error(error);
@@ -44,7 +45,7 @@ function localServerResponse(path, clientRes) {
             })
             clientRes.write(data);
             clientRes.end()
-            console.log('STATUS: 200')
+            // console.log('STATUS: 200')
         }
     });
 }
@@ -256,7 +257,7 @@ function requestListener(req, res) {
         console.log('Preflight Request Responded: ' + req.url);
         return true;
     } else if (req.method === 'POST' && req.url === '/LCPP') {
-        console.log('POST')
+        console.log('LCPP Registration')
         let body = '';
         req.on('data', (data) => {
             body += data.toString();
@@ -266,17 +267,18 @@ function requestListener(req, res) {
                 let json = JSON.parse(body);
                 console.log(json)
                 if (json) {
-                    const url = json.url ? json.url : undefined;
-                    if (url) {
+                    const target = json.target ? json.target : undefined;
+                    const origin = json.origin ? json.origin : undefined;
+                    if (origin && target) {
                         const identifier = json.identifier ? json.identifier : undefined;
-                        const identifierArray = identifier.split('-');
-                        const hash = identifierArray[1];
                         if (identifier && /^LCPP-.*-\d*-.*-CROS$/.test(identifier)) {
+                            const identifierArray = identifier.split('-');
+                            const hash = identifierArray[1];
                             if (!SERVER_GLOBAL.LCPP[hash]) {
                                 const time = Number(new Date); // generate time stamp based on server time, can't always trust the client
                                 const uuid = identifierArray[3];
 
-                                SERVER_GLOBAL.LCPP[hash] = [uuid, url, time];
+                                SERVER_GLOBAL.LCPP[hash] = [uuid, origin, target, time];
 
                                 res.writeHead(201, {'Location': '/LCPP/' + identifier});
                                 res.end();
@@ -358,7 +360,7 @@ function upgradeListener(req, clientSocket, head) {
     // extract the identifier from the request url
     let path = req.url.substring(1).split('/');
     const identifier = path.shift();
-    const url = path.join('/'); // the target url
+    // const url = path.join('/'); // the target url
 
     // LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
     if (/^LCPP-.*-\d*-.*-CROS$/.test(identifier)) {
@@ -368,8 +370,9 @@ function upgradeListener(req, clientSocket, head) {
         const uuid = identifierArray[3];
         if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
             const requestInfo = SERVER_GLOBAL.LCPP[hash];
-            const target = new URL(requestInfo[2]);
             const client = requestInfo[0];
+            const origin = new URL(requestInfo[1]);
+            const target = new URL(requestInfo[2]);
             // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
             if (client === uuid && Number(new Date()) - Number(time) < 60000) { // id and time out 
                 console.log('LCPP-OK')
@@ -379,6 +382,7 @@ function upgradeListener(req, clientSocket, head) {
                     let headers = req.headers;
                     headers.Host = target.hostname; // change host to the target host
                     headers.origin = origin; // change origin to the target origin
+                    console.log(headers)
 
                     socket.write('HTTP/1.1 101 Switching Protocols\r\n'); // let the server know we are upgrading
                     headers.forEach((value, key) => {
@@ -398,7 +402,7 @@ function upgradeListener(req, clientSocket, head) {
             }
         }
     } else {
-        abortHandshake(clientSocket, 400)
+        clientSocket.destroy();
     }
 
     // const key = req.headers['sec-websocket-key'] ? req.headers['sec-websocket-key'] : abortHandshake(clientSocket, 400)
@@ -426,8 +430,8 @@ function upgradeListener(req, clientSocket, head) {
     // Create the server
     const proxy = ENGINE == 'NATIVE' ? 
         https.createServer({
-            key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
-            cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
+            key: fs.readFileSync('./key.pem'),
+            cert: fs.readFileSync('./cert.pem')
         }) 
         : http.createServer() // we use http on on non Natvie engines because it's already https by default
         

@@ -1,5 +1,7 @@
-const CROS_SERVER_ENDPOINT = serviceWorker.scriptURL.substring(0, serviceWorker.scriptURL.length - 28); //'https://cros-proxy-testing.glitch.me/'
+const CROS_SERVER_ENDPOINT = serviceWorker.scriptURL.substring(0, serviceWorker.scriptURL.length - 10); //'https://cros-proxy-testing.glitch.me/'
 let CURRENT_URL = "";
+const clientUUID = 'undefined!undefined!undefined!undefined!'; 
+
 let webSockets = {};
 
 
@@ -12,7 +14,7 @@ const REGEXP_CROS_SERVER_ENDPOINT = new RegExp(RegExp.escape(CROS_SERVER_ENDPOIN
 
 self.addEventListener('install', function (event) {
     console.log('Service worker installed.');
-    event.waitUntil(self.skipWaiting());
+    self.skipWaiting();
 });
 
 self.addEventListener("message", async function (event){
@@ -27,64 +29,65 @@ self.addEventListener("message", async function (event){
                 let {host, origin, href} = new URL(event.data.url);
                 const identifier = await generateIdentifier(host, origin);
                 // set the target url pointing to our endpoint and send the websocket
-                const targetUrl = CROS_SERVER_ENDPOINT + identifier;
-                const socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols); 
+                const targetUrl = (CROS_SERVER_ENDPOINT + 'LCPP/' + identifier).replace(/https?:\/\//, 'wss://');
                 if (await notifyServer(identifier, event.data.url)) {
-
-                }
-                // listeners
-                socket.onopen = () => {
-                    client.postMessage({
-                        type: 'WEB_SOCKET_open',
-                        id: id
-                    })
-                }
-
-                socket.onmessage = (event) => {
-                    client.postMessage({
-                        type: 'WEB_SOCKET_message',
-                        id: id,
-                        event: {
-                            data: event.data, 
-                            origin: event.origin, // API rewrite required
-                            lastEventId: event.lastEventId,
-                            source: undefined, //event.source // API rewrite required
-                            ports: event.ports 
-                        }
-                    })
-                }
-                
-                socket.onclose = (event) => {
-                    client.postMessage({
-                        type: 'WEB_SOCKET_close',
-                        id: id,
-                        event: {
-                            code: event.code,
-                            reason: event.reason,
-                            wasClean: event.wasClean
-                        }
-                    })
-                }
-
-                socket.onerror = () => {
-                    client.postMessage({
-                        type: 'WEB_SOCKET_error',
-                        id: id
-                    })
-                }
-
-                client.postMessage({
-                    type: 'WEB_SOCKET_INIT',
-                    status: 'ok',
-                    socket: {
-                        binaryType: socket.binaryType,
-                        bufferedAmount: socket.bufferedAmount,
-                        extensions: socket.extensions,
-                        protocol: socket.protocol,
-                        readyState: socket.readyState,
-                        url: event.data.url
+                    const socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols);
+                    // listeners
+                    socket.onopen = () => {
+                        client.postMessage({
+                            type: 'WEB_SOCKET_open',
+                            id: id
+                        })
                     }
-                });
+
+                    socket.onmessage = (event) => {
+                        client.postMessage({
+                            type: 'WEB_SOCKET_message',
+                            id: id,
+                            event: {
+                                data: event.data,
+                                origin: event.origin, // API rewrite required
+                                lastEventId: event.lastEventId,
+                                source: undefined, //event.source // API rewrite required
+                                ports: event.ports
+                            }
+                        })
+                    }
+
+                    socket.onclose = (event) => {
+                        client.postMessage({
+                            type: 'WEB_SOCKET_close',
+                            id: id,
+                            event: {
+                                code: event.code,
+                                reason: event.reason,
+                                wasClean: event.wasClean
+                            }
+                        })
+                    }
+
+                    socket.onerror = () => {
+                        client.postMessage({
+                            type: 'WEB_SOCKET_error',
+                            id: id
+                        })
+                    }
+
+                    client.postMessage({
+                        type: 'WEB_SOCKET_INIT',
+                        status: 'ok',
+                        socket: {
+                            binaryType: socket.binaryType,
+                            bufferedAmount: socket.bufferedAmount,
+                            extensions: socket.extensions,
+                            protocol: socket.protocol,
+                            readyState: socket.readyState,
+                            url: event.data.url
+                        }
+                    });
+                }else{
+                    throw 'Server rejected the request.';
+                }
             } catch (error) {
                 console.log(error);
                 client.postMessage({
@@ -144,14 +147,14 @@ async function generateIdentifier(host, origin) {
 
 // ya, we're definely gonna switch to socket io afterwards .......
 async function notifyServer(identifier, target) {
-    const req = new Request('https://127.0.0.1:5000/LCPP', {
+    const req = new Request(CROS_SERVER_ENDPOINT + 'LCPP', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'content-type': 'application/json'
         },
         body: JSON.stringify({
             identifier: identifier,
-            origin: currentURL,
+            origin: CURRENT_URL,
             target: target
         })
     })
@@ -173,7 +176,7 @@ async function notifyServer(identifier, target) {
  */
 async function parseHTML(htmlDocument) {
     const buffer = new Array(6); 
-    const notMatched = true; 
+    const bufferLength = buffer.length - 1;
     for (let i = 0; i < 6; i++) {
         buffer[i] = htmlDocument[i];
     }// fill the buffer
@@ -182,12 +185,12 @@ async function parseHTML(htmlDocument) {
         if (buffer.join('') == '<head>') { // check if we found the header we wanted
             // insert at the next length 
             htmlDocument = htmlDocument.slice(0, i) + 
-            '<script type="text/jsvascript" src="ws.sw.js">' +
+            '<script src="/ws.js"></script>' +
             htmlDocument.slice(i); 
             break;
         }
         buffer.shift(); // remove the previous char
-        buffer[6] = htmlDocument[i]; // insert the new char
+        buffer[bufferLength] = htmlDocument[i]; // insert the new char
     }
     return htmlDocument
 }
@@ -230,9 +233,10 @@ function newReq(request,url) {
 }
 
 const localResource = [ // local resource that the client can access
-    'index.html',
-    'client.html',
-    'cros-proxy-service-worker.js'
+    'ws.js',
+    'index.test.js',
+    'test.html',
+    'sw.test.js'
 ]
 // request handler
 async function handler(request) {
@@ -275,9 +279,16 @@ async function handler(request) {
             url
         ));
     }
- 
-    if (response && response.headers.get('content-type') == 'text/html') {
-        return await parseHTML(await response.text())
+    // console.log(response.headers.forEach(function (value, key) {
+    //     console.log(key + ': ' + value)
+    // }));
+    const contentType = response.headers.get('content-type');
+    if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
+        return new Response(await parseHTML(await response.text()), {
+            status: response.status,
+            statusText: response.statusText,
+            headers: new Headers(response.headers),
+        })
     }else{
         return response;
     }

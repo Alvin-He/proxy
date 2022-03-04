@@ -33,7 +33,7 @@ const localResource = [ // local resource that the client can access
 const ENGINE = process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS ? 'GLITCH' : process.env.XDG_CONFIG_HOME ? 'REPLIT' : 'NATIVE'
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
-let DIR_PATH = new Promise((resolve, reject) => {fs.access('./corsidium.js',(err)=>{if(err){DIR_PATH = 'proxy/';}else{DIR_PATH='./';}resolve();});});
+const DIR_PATH = ENGINE == 'NATIVE' ? './' : './proxy/';
  
 const CROS_MAX_AGE = 0
 
