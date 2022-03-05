@@ -14,6 +14,7 @@
   "scripts": {
     "lint": "eslint .",
     "start": "node proxy/corsidium.js",
+    "debug": "node ./test/server.test.js",
     "test": "node corsidium.js"
   },
   "engines": {

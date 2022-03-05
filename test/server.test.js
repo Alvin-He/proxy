@@ -20,7 +20,7 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const ENGINE = process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS ? 'GLITCH' : process.env.XDG_CONFIG_HOME ? 'REPLIT' : 'NATIVE'
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
-const DIR_PATH = ENGINE == 'NATIVE' ? './' : './proxy/';
+const DIR_PATH = process.env.DIR_PATH ? process.env.DIR_PATH : (ENGINE == 'NATIVE' ? './' : './proxy/');
 
 const CROS_MAX_AGE = 0
 
@@ -278,11 +278,12 @@ function requestListener(req, res) {
                                 const time = Number(new Date); // generate time stamp based on server time, can't always trust the client
                                 const uuid = identifierArray[3];
 
-                                SERVER_GLOBAL.LCPP[hash] = [uuid, origin, target, time];
+                                SERVER_GLOBAL.LCPP[hash.toString()] = [uuid, origin, target, time];
 
                                 res.writeHead(201, {'Location': '/LCPP/' + identifier});
                                 res.end();
-                                return; 
+                                console.log('LCPP Registration Successful: ' + identifier);
+                                return true; 
             }   }   }   }   }// else 
             res.statusCode = 400;
             res.end();
@@ -369,12 +370,16 @@ function upgradeListener(req, clientSocket, head) {
         const time = identifierArray[2];
         const uuid = identifierArray[3];
         if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
-            const requestInfo = SERVER_GLOBAL.LCPP[hash];
+            const requestInfo = Array.from(SERVER_GLOBAL.LCPP[hash]); // copy the array 
+            delete SERVER_GLOBAL.LCPP[hash]; // delete the hash from the LCPP
+            console.log('INFO: ')
+            console.log(requestInfo);
             const client = requestInfo[0];
             const origin = new URL(requestInfo[1]);
             const target = new URL(requestInfo[2]);
             // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
-            if (client === uuid && Number(new Date()) - Number(time) < 60000) { // id and time out 
+            //&& Number(new Date()) - Number(time) < 60000
+            if (client == uuid ) { // id and time out 
                 console.log('LCPP-OK')
                 const proxyReq = net.connect(target.port || 80, target.hostname, (socket) => {
 
@@ -402,6 +407,7 @@ function upgradeListener(req, clientSocket, head) {
             }
         }
     } else {
+        console.log('LCPP-ERROR')
         clientSocket.destroy();
     }
 
@@ -430,8 +436,8 @@ function upgradeListener(req, clientSocket, head) {
     // Create the server
     const proxy = ENGINE == 'NATIVE' ? 
         https.createServer({
-            key: fs.readFileSync('./key.pem'),
-            cert: fs.readFileSync('./cert.pem')
+            key: fs.readFileSync( DIR_PATH + 'key.pem' ),
+            cert: fs.readFileSync(DIR_PATH + 'cert.pem'),
         }) 
         : http.createServer() // we use http on on non Natvie engines because it's already https by default
         

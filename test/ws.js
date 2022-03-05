@@ -1,19 +1,4 @@
 // WebSocket API overwrite 
-
-if ('serviceWorker' in navigator) {
-    // window.addEventListener('load', function () {
-    navigator.serviceWorker.register('ws.sw.js').then(function (registration) {
-        // Registration was successful
-        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        return;
-    }, function (err) {
-        // registration failed :(
-        console.log('ServiceWorker registration failed: ', err);
-        return err;
-    });
-    // });
-}
-
 const sw = navigator.serviceWorker
 
 
@@ -46,13 +31,12 @@ const preSets = {
     url: '',            // aWebSocket.url : DOMString
 }
 
-let currentID = 0
 class ws extends EventTarget {
     constructor(url, protocols) {
         super() // EventTarget initialization 
 
         // proxy defined properties
-        this.SOCKET_IDENTIFIER = ++currentID
+        this.SOCKET_IDENTIFIER = 0;
 
         // WebSocket properties
         this.binaryType = preSets.binaryType.blob
@@ -69,14 +53,16 @@ class ws extends EventTarget {
         this.CLOSED = 3
 
         sw.addEventListener('message', (event) => {
-            if (event.data && event.data.id == this.SOCKET_IDENTIFIER) {
-                const data = event.data
+            if (event.data) {
+                const data = event.data;
+                const id = data.SOCKET_ID;
                 if (data.type == 'WEB_SOCKET_INIT') {
                     console.log('status: ' + data.status + '\nSocket Information:');
                     if (data.status == 'ok') {
+                        this.SOCKET_IDENTIFIER = id;
                         console.log(data.socket); 
                         // copy the data from the sw to this object 
-                        for (property in data.socket) {
+                        for (let property in data.socket) {
                             this[property] = data.socket[property];
                         }
                     }else{
@@ -85,7 +71,7 @@ class ws extends EventTarget {
                     
 
                 } else if (data.type == 'WEB_SOCKET_message') {
-                    console.log('Socket Message ID: ' + data.id)
+                    console.log('Socket Message ID: ' + id)
                     console.log(data.event)
                     this.dispatchEvent(new MessageEvent('message', {
                         data: data.event.data, 
@@ -95,15 +81,15 @@ class ws extends EventTarget {
                     }))
 
                 } else if (data.type == 'WEB_SOCKET_open') {
-                    console.log('Socket Open ID: ' + data.id)
+                    console.log('Socket Open ID: ' + id)
                     this.dispatchEvent(new Event('open'))
 
                 } else if (data.type == 'WEB_SOCKET_error') {
-                    console.log('Socket Error ID: ' + data.id)
+                    console.log('Socket Error ID: ' + id)
                     this.dispatchEvent(new Event('error')); 
 
                 } else if (data.type == 'WEB_SOCKET_close') {
-                    console.log('Socket Close ID: ' + data.id)
+                    console.log('Socket Close ID: ' + id)
                     console.log(data.event)
                     this.dispatchEvent(new CloseEvent('close', {
                         wasClean: data.event.wasClean, 
@@ -120,7 +106,7 @@ class ws extends EventTarget {
             type: 'WEB_SOCKET_INIT',
             url: url,
             protocols: protocols ? protocols : undefined,
-            id: this.SOCKET_IDENTIFIER,
+            // id: this.SOCKET_IDENTIFIER,
         })
         
         

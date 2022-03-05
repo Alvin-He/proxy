@@ -2,7 +2,10 @@ const CROS_SERVER_ENDPOINT = serviceWorker.scriptURL.substring(0, serviceWorker.
 let CURRENT_URL = "";
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
 
-let webSockets = {};
+let currentID = 0;
+let webSockets = {
+    0: null, // 0 is the default websocket(null);
+};
 
 
 // Escaping a string into a regexp, https://stackoverflow.com/a/494122
@@ -19,10 +22,10 @@ self.addEventListener('install', function (event) {
 
 self.addEventListener("message", async function (event){
     if (event.data){
-        const client = event.source; 
-        const id = event.data.id; 
         if (event.data.type == 'WEB_SOCKET_INIT') {
             console.log('WEB_SOCKET_INIT')
+            const client = event.source;
+            const id = currentID++; 
             try {
                 if (webSockets[id] != undefined) { throw 'Web socket with id: ' + id + 'already exist.'}
                 // generate the identifier
@@ -36,14 +39,14 @@ self.addEventListener("message", async function (event){
                     socket.onopen = () => {
                         client.postMessage({
                             type: 'WEB_SOCKET_open',
-                            id: id
+                            SOCKET_ID: id
                         })
                     }
 
                     socket.onmessage = (event) => {
                         client.postMessage({
                             type: 'WEB_SOCKET_message',
-                            id: id,
+                            SOCKET_ID: id,
                             event: {
                                 data: event.data,
                                 origin: event.origin, // API rewrite required
@@ -57,7 +60,7 @@ self.addEventListener("message", async function (event){
                     socket.onclose = (event) => {
                         client.postMessage({
                             type: 'WEB_SOCKET_close',
-                            id: id,
+                            SOCKET_ID: id,
                             event: {
                                 code: event.code,
                                 reason: event.reason,
@@ -69,13 +72,14 @@ self.addEventListener("message", async function (event){
                     socket.onerror = () => {
                         client.postMessage({
                             type: 'WEB_SOCKET_error',
-                            id: id
+                            SOCKET_ID: id
                         })
                     }
 
                     client.postMessage({
                         type: 'WEB_SOCKET_INIT',
                         status: 'ok',
+                        SOCKET_ID: id,
                         socket: {
                             binaryType: socket.binaryType,
                             bufferedAmount: socket.bufferedAmount,
@@ -159,7 +163,7 @@ async function notifyServer(identifier, target) {
         })
     })
 
-    let res = await fetch(req)
+    let res = await fetch(req);
     if (res.status == 201) { // if the server accepted the request
         return true;
     }else{ // if the server rejected the request, signal error to the client
