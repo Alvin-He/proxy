@@ -8,6 +8,7 @@ const regexp_tld = require('../lib/regexp-top-level-domain');
 const fs = require('fs');
 const { URL } = require('url');
 const { createHash } = require('crypto');
+const { test } = require('../lib/regexp-top-level-domain');
 const localResource = [ // local resource that the client can access
     'ws.js',
     'index.test.js',
@@ -356,11 +357,11 @@ function upgradeListener(req, clientSocket, head) {
     console.log('upgrade');
     console.log(req.url)
     console.log(req.headers)
-    console.log(head.toString('utf8'))
+    // console.log(head.toString('utf8'))
 
     // extract the identifier from the request url
     let path = req.url.substring(1).split('/');
-    const identifier = path.shift();
+    const identifier = path.pop();
     // const url = path.join('/'); // the target url
 
     // LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
@@ -371,38 +372,53 @@ function upgradeListener(req, clientSocket, head) {
         const uuid = identifierArray[3];
         if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
             const requestInfo = Array.from(SERVER_GLOBAL.LCPP[hash]); // copy the array 
-            delete SERVER_GLOBAL.LCPP[hash]; // delete the hash from the LCPP
             console.log('INFO: ')
             console.log(requestInfo);
             const client = requestInfo[0];
             const origin = new URL(requestInfo[1]);
             const target = new URL(requestInfo[2]);
+            const port = target.port || /s:\/\//.test(target.protocol) ? 443 : 80;
             // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
             //&& Number(new Date()) - Number(time) < 60000
             if (client == uuid ) { // id and time out 
                 console.log('LCPP-OK')
-                const proxyReq = net.connect(target.port || 80, target.hostname, (socket) => {
+                delete SERVER_GLOBAL.LCPP[hash]; // delete the hash from the LCPP
+                const proxySocket = net.createConnection(port, target.hostname, () => {
 
                     // TODO: generate a websocket upgrade request since we already used it
                     let headers = req.headers;
-                    headers.Host = target.hostname; // change host to the target host
-                    headers.origin = origin; // change origin to the target origin
+                    headers.host = target.hostname; // change host to the target host
+                    headers.origin = origin.href; // change origin to the target origin
                     console.log(headers)
 
-                    socket.write('HTTP/1.1 101 Switching Protocols\r\n'); // let the server know we are upgrading
-                    headers.forEach((value, key) => {
-                        socket.write(`${key}: ${value}\r\n`);
+                    // it's GET [the path of the uri] HTTP/1.1\r\n
+                    
+                    proxySocket.write('GET ' + target.pathname + ' HTTP/1.1\r\n'); // let the server know we are upgrading
+                    Object.keys(headers).forEach((key) => {
+                        proxySocket.write(key + ': ' + headers[key] + '\r\n');
                     });
-                    socket.write('\r\n'); // end of headers
-                    socket.write(head); // write the request body from the client 
-                    socket.pipe(clientSocket);
-                    clientSocket.pipe(socket);
+                    proxySocket.write('\r\n'); // end of headers
+                    console.log('request sent');
+
+                    // socket.write(head); // write the request body from the client 
+                    proxySocket.pipe(clientSocket);
+                    clientSocket.pipe(proxySocket);
+                    
                 });
-                proxyReq.on('close', () => {
+                proxySocket.on('data', (data) => {
+                    console.log('Target server incoming:')
+                    console.log(data.toString('utf8'));
+                })
+                clientSocket.on('data', (data) => {
+                    console.log('Client incoming:')
+                    console.log(data.toString('utf8'));
+                })
+                proxySocket.on('close', () => {
                     clientSocket.destroy();
                 });
+                // proxySocket.on('')
                 clientSocket.on('close', () => {
-                    proxyReq.destroy();
+                    proxySocket.destroy();
                 });
             }
         }
