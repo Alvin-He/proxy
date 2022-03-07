@@ -52,6 +52,26 @@ class ws extends EventTarget {
         this.CLOSING = 2,
         this.CLOSED = 3
 
+
+        this.send = function (data) {
+            console.log('client send: ', data);
+            sw.controller.postMessage({
+                type: 'WEB_SOCKET_send',
+                id: this.SOCKET_IDENTIFIER,
+                data: data
+            })
+        }
+        this.close = function (code, reason) {
+            console.log('client close: ', code, reason);
+            this.readyState = preSets.readyState.CLOSING;
+            sw.controller.postMessage({
+                type: 'WEB_SOCKET_close',
+                id: this.SOCKET_IDENTIFIER,
+                code: code ? code : 1000,
+                reason: reason ? reason : undefined
+            })
+        }
+
         sw.addEventListener('message', (event) => {
             if (event.data) {
                 const data = event.data;
@@ -60,11 +80,14 @@ class ws extends EventTarget {
                     console.log('status: ' + data.status + '\nSocket Information:');
                     if (data.status == 'ok') {
                         this.SOCKET_IDENTIFIER = id;
-                        console.log(data.socket); 
+                        console.log('Socket :',data.socket); 
                         // copy the data from the sw to this object 
-                        for (let property in data.socket) {
-                            this[property] = data.socket[property];
-                        }
+                        this.binaryType = data.socket.binaryType;
+                        this.bufferedAmount = data.socket.bufferedAmount;
+                        this.extensions = data.socket.extensions;
+                        this.protocol = data.socket.protocol;
+                        this.readyState = data.socket.readyState;
+                        this.url = data.socket.url;
                     }else{
                         console.log(data.error)
                     }
@@ -75,22 +98,28 @@ class ws extends EventTarget {
                     console.log(data.event)
                     this.dispatchEvent(new MessageEvent('message', {
                         data: data.event.data, 
-                        origin: event.data.origin, 
+                        origin: this.url,
                         lastEventId: data.event.lastEventId, 
-                        source: window
-                    }))
+                        source: window.document.defaultView
+                    })); 
+                    if (this.onmessage) { this.onmessage(data.event) }
 
                 } else if (data.type == 'WEB_SOCKET_open') {
                     console.log('Socket Open ID: ' + id)
-                    this.dispatchEvent(new Event('open'))
+                    this.readyState = preSets.readyState.OPEN;
+                    this.dispatchEvent(new Event('open'));
+                    if (this.onopen) { this.onopen() };
 
                 } else if (data.type == 'WEB_SOCKET_error') {
                     console.log('Socket Error ID: ' + id)
+                    this.readyState = preSets.readyState.CLOSING;
                     this.dispatchEvent(new Event('error')); 
+                    if (this.onerror) { this.onerror() };
 
                 } else if (data.type == 'WEB_SOCKET_close') {
                     console.log('Socket Close ID: ' + id)
                     console.log(data.event)
+                    this.readyState = preSets.readyState.CLOSED;
                     this.dispatchEvent(new CloseEvent('close', {
                         wasClean: data.event.wasClean, 
                         code: data.event.code, 
@@ -112,24 +141,6 @@ class ws extends EventTarget {
         
 
         return this
-    }
-    
-    send(data) {
-        console.log(data); 
-        sw.controller.postMessage({
-            type: 'WEB_SOCKET_send', 
-            id: this.SOCKET_IDENTIFIER,
-            data: data
-        })
-    }
-    close(code, reason) {
-        console.log(code, reason); 
-        sw.controller.postMessage({
-            type: 'WEB_SOCKET_close',
-            id: this.SOCKET_IDENTIFIER,
-            code: code ? code : 1000, 
-            reason: reason ? reason : undefined
-        })
     }
 }
 

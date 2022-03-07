@@ -36,28 +36,28 @@ self.addEventListener("message", async function (event){
                 if (await notifyServer(identifier, event.data.url)) {
                     const socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols);
                     // listeners
-                    socket.onopen = () => {
+                    socket.addEventListener('open', () => {
                         client.postMessage({
                             type: 'WEB_SOCKET_open',
                             SOCKET_ID: id
                         })
-                    }
+                    });
 
-                    socket.onmessage = (event) => {
+                    socket.addEventListener('message', (event) => {
                         client.postMessage({
                             type: 'WEB_SOCKET_message',
                             SOCKET_ID: id,
                             event: {
                                 data: event.data,
-                                origin: event.origin, // API rewrite required
+                                origin: undefined, // API rewrite required
                                 lastEventId: event.lastEventId,
                                 source: undefined, //event.source // API rewrite required
                                 ports: event.ports
                             }
                         })
-                    }
+                    });
 
-                    socket.onclose = (event) => {
+                    socket.addEventListener('close', (event) => {
                         client.postMessage({
                             type: 'WEB_SOCKET_close',
                             SOCKET_ID: id,
@@ -67,14 +67,14 @@ self.addEventListener("message", async function (event){
                                 wasClean: event.wasClean
                             }
                         })
-                    }
+                    }); 
 
-                    socket.onerror = () => {
+                    socket.addEventListener('error', () => {
                         client.postMessage({
                             type: 'WEB_SOCKET_error',
                             SOCKET_ID: id
                         })
-                    }
+                    });
 
                     client.postMessage({
                         type: 'WEB_SOCKET_INIT',

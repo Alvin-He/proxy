@@ -422,11 +422,11 @@ function upgradeListener(req, clientSocket, head) {
                 proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));
                 proxySocket.on('data', (data) => {
                     console.log('Target server incoming:')
-                    console.log(data.toString('utf8'));
+                    console.log(data.toString());
                 })
                 clientSocket.on('data', (data) => {
                     console.log('Client incoming:')
-                    console.log(data.toString('utf8'));
+                    console.log(data.toString());
                 })
                 proxySocket.on('close', () => {
                     clientSocket.destroy();
