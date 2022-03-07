@@ -1,14 +1,14 @@
 // test server, don't load it for production 
 'use strict';
 
-const net = require('net')
-const http = require('http')
-const https = require('https')
+const net = require('net');
+const tls = require('tls');
+const http = require('http');
+const https = require('https');
 const regexp_tld = require('../lib/regexp-top-level-domain');
 const fs = require('fs');
 const { URL } = require('url');
 const { createHash } = require('crypto');
-const { test } = require('../lib/regexp-top-level-domain');
 const localResource = [ // local resource that the client can access
     'ws.js',
     'index.test.js',
@@ -22,6 +22,8 @@ const ENGINE = process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS ? 'GLITCH' : proces
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
 const DIR_PATH = process.env.DIR_PATH ? process.env.DIR_PATH : (ENGINE == 'NATIVE' ? './' : './proxy/');
+const SSL_KEY_LOG_FILE = process.env.SSLKEYLOGFILE ? fs.createWriteStream(process.env.SSLKEYLOGFILE, { flags: 'a' }) : null;
+if (SSL_KEY_LOG_FILE) { process.on('exit', () => SSL_KEY_LOG_FILE.end()); } // close the log file
 
 const CROS_MAX_AGE = 0
 
@@ -126,7 +128,7 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         protocol: targetURL.protocol || 'http:',
         // default port based on protocols(http:80 https:443)
         port: targetURL.port || targetURL.protocol == 'http:' ? 80 : 443,
-        path: targetURL.pathname || '/',
+        path: (targetURL.pathname || '/') + (targetURL.search || ''),
         method: clientReq.method,
         headers: clientReq.headers
     }
@@ -356,9 +358,7 @@ function requestListener(req, res) {
 function upgradeListener(req, clientSocket, head) {
     console.log('upgrade');
     console.log(req.url)
-    console.log(req.headers)
     // console.log(head.toString('utf8'))
-
     // extract the identifier from the request url
     let path = req.url.substring(1).split('/');
     const identifier = path.pop();
@@ -376,26 +376,40 @@ function upgradeListener(req, clientSocket, head) {
             console.log(requestInfo);
             const client = requestInfo[0];
             const origin = new URL(requestInfo[1]);
-            const target = new URL(requestInfo[2]);
-            const port = target.port || /s:\/\//.test(target.protocol) ? 443 : 80;
+            let target = new URL(requestInfo[2]);
+            const port = target.port || target.protocol == 'wss:' ? 443 : 80;
             // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
             //&& Number(new Date()) - Number(time) < 60000
             if (client == uuid ) { // id and time out 
                 console.log('LCPP-OK')
                 delete SERVER_GLOBAL.LCPP[hash]; // delete the hash from the LCPP
-                const proxySocket = net.createConnection(port, target.hostname, () => {
+                // wsRedirect(target, origin, req.headers, clientSocket);
+                const proxySocket = tls.connect({
+                    isServer: false,
+                    host: target.hostname,
+                    port: port,
+                    // rejectUnauthorized: false,
+                    servername: target.hostname,
+                }, () => {
+                // const proxySocket = net.createConnection(port, target.hostname, () => {
 
                     // TODO: generate a websocket upgrade request since we already used it
-                    let headers = req.headers;
-                    headers.host = target.hostname; // change host to the target host
-                    headers.origin = origin.href; // change origin to the target origin
-                    console.log(headers)
-
-                    // it's GET [the path of the uri] HTTP/1.1\r\n
-                    
-                    proxySocket.write('GET ' + target.pathname + ' HTTP/1.1\r\n'); // let the server know we are upgrading
-                    Object.keys(headers).forEach((key) => {
-                        proxySocket.write(key + ': ' + headers[key] + '\r\n');
+                    proxySocket.write('GET ' + target.href + ' HTTP/1.1\r\n'); // let the server know we are upgrading
+                    req.rawHeaders.forEach((value, index) => {
+                        if (index % 2 == 0) {
+                            if (/host/i.test(value)) {
+                                proxySocket.write(value + ': ' + target.hostname + '\r\n');
+                                console.log(value + ': ' + target.hostname);
+                            } else if (/origin/i.test(value)) {
+                                proxySocket.write(value + ': ' + origin.origin + '\r\n');
+                                console.log(value + ': ' + origin.origin);
+                            } else if (/cookie/i.test(value)) {
+                                ; // do nothing 
+                            }else{
+                                proxySocket.write(value + ': ' + req.rawHeaders[index + 1] + '\r\n');
+                                console.log(value + ': ' + req.rawHeaders[index + 1]);
+                            }
+                        }
                     });
                     proxySocket.write('\r\n'); // end of headers
                     console.log('request sent');
@@ -405,6 +419,7 @@ function upgradeListener(req, clientSocket, head) {
                     clientSocket.pipe(proxySocket);
                     
                 });
+                proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));
                 proxySocket.on('data', (data) => {
                     console.log('Target server incoming:')
                     console.log(data.toString('utf8'));
