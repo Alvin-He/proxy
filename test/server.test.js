@@ -21,7 +21,7 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const ENGINE = process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS ? 'GLITCH' : process.env.XDG_CONFIG_HOME ? 'REPLIT' : 'NATIVE'
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
-const DIR_PATH = process.env.DIR_PATH ? process.env.DIR_PATH : (ENGINE == 'NATIVE' ? './' : './proxy/');
+const DIR_PATH = process.env.DIR_PATH ? process.env.DIR_PATH : (ENGINE == 'NATIVE' ? './' : './');
 const SSL_KEY_LOG_FILE = process.env.SSLKEYLOGFILE ? fs.createWriteStream(process.env.SSLKEYLOGFILE, { flags: 'a' }) : null;
 if (SSL_KEY_LOG_FILE) { process.on('exit', () => SSL_KEY_LOG_FILE.end()); } // close the log file
 
@@ -419,7 +419,7 @@ function upgradeListener(req, clientSocket, head) {
                     clientSocket.pipe(proxySocket);
                     
                 });
-                proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));
+                if (SSL_KEY_LOG_FILE) {proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));}
                 proxySocket.on('data', (data) => {
                     console.log('Target server incoming:')
                     console.log(data.toString());
