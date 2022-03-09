@@ -33,10 +33,10 @@ navigator.serviceWorker.addEventListener('message', (event) => {
 function doCORSRequest() {
     let url = document.getElementById('Url').value; 
     //create callback
-    serviceWorkerFetchs[url] = (response, status) => {
-        console.log("GET" + ' ' + url + ' ' + status);
-        // window.document.getElementsByTagName('html')[0].innerHTML = "";
-        if (status == 'ok') {
+    // serviceWorkerFetchs[url] = (response, status) => {
+    //     console.log("GET" + ' ' + url + ' ' + status);
+    //     // window.document.getElementsByTagName('html')[0].innerHTML = "";
+    //     if (status == 'ok') {
             // updates the current url 
             navigator.serviceWorker.controller.postMessage({
                 type: 'UPDATE_CURRENT_URL',
@@ -46,12 +46,12 @@ function doCORSRequest() {
             // let newWindow = window.open('https://127.0.0.1:3000')
             // newWindow.document.write(response)
             // newWindow.document.scripts.
-        }
+        // }
 
-    }
+    // }
     // tell the serviceWorker to initiate the request 
-    navigator.serviceWorker.controller.postMessage({
-        type : 'FETCH_DOCUMENT', 
-        url : url
-    })
+    // navigator.serviceWorker.controller.postMessage({
+    //     type : 'FETCH_DOCUMENT', 
+    //     url : url
+    // })
 }

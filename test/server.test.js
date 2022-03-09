@@ -198,24 +198,48 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     }
 
     if (statusCode > 300 && statusCode < 400){ //redirect response handling, skipping 300 since it requires user agent(browser)
-        const locationHeader = resolve(proxyReq.url.href, proxyRes.headers.location)
+        let locationHeader = proxyRes.headers.location //resolve(proxyReq.url.href, proxyRes.headers.location)
         if (locationHeader) {
-            console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
-            totRedirs += 1; 
-            proxyReq.meta = clientReq.meta; 
-            proxyReq.headers = clientReq.headers; // copy over the initial request headers
-            // Remove all listeners (=reset events to initial state)
-            clientReq.removeAllListeners();
-            // clientReq.addListener('error')
+            if (/^https?:\/\//.test(locationHeader)) {
+                locationHeader = 'https://127.0.0.1:3000/' + locationHeader;
+                console.log('Redirecting to: ' + locationHeader)
+                proxyRes.headers.location = locationHeader;
+                clientRes.writeHead(statusCode, proxyRes.headers);
+                proxyRes.on('data', (chunk) => {
+                    clientRes.write(chunk)
+                    // console.log(`BODY: ${chunk}`);
+                });
+                proxyRes.on('end', () => {
+                    // console.log('No more data in response.');
+                    clientRes.end()
+                });
+            }else{
+                clientRes.writeHead(statusCode, proxyRes.headers);
+                proxyRes.on('data', (chunk) => {
+                    clientRes.write(chunk)
+                    // console.log(`BODY: ${chunk}`);
+                });
+                proxyRes.on('end', () => {
+                    // console.log('No more data in response.');
+                    clientRes.end()
+                });
+            }
+            // console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
+            // totRedirs += 1; 
+            // proxyReq.meta = clientReq.meta; 
+            // proxyReq.headers = clientReq.headers; // copy over the initial request headers
+            // // Remove all listeners (=reset events to initial state)
+            // clientReq.removeAllListeners();
+            // // clientReq.addListener('error')
             
-            // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
-            // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
-            // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
-            proxyReq.removeAllListeners('error');
-            proxyReq.once('error', () => {}); 
-            proxyReq.destroy(); 
+            // // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
+            // // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
+            // // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
+            // proxyReq.removeAllListeners('error');
+            // proxyReq.once('error', () => {}); 
+            // proxyReq.destroy(); 
             
-            proxyRequest(new URL (locationHeader), proxyReq, clientRes)
+            // proxyRequest(new URL (locationHeader), proxyReq, clientRes)
         }
     } else {
         proxyRes.headers['Content-Security-Policy'] = 'default-src *';
@@ -301,11 +325,11 @@ function requestListener(req, res) {
         let targetURL
 
         try {
-            // p-document-get overrides cookies and local resource
-            if (req.headers['p-document-get']) { 
-                targetURL = new URL(req.headers['p-document-get']);
+            // // p-document-get overrides cookies and local resource
+            // if (req.headers['p-document-get']) { 
+            //     targetURL = new URL(req.headers['p-document-get']);
 
-            } else { 
+            // } else { 
                 targetURL = req.url.substring(1);
                 // local resource loading, local resource overrides cookies
                 for (const path of localResource) {
@@ -325,7 +349,7 @@ function requestListener(req, res) {
                 } else {
                     targetURL = new URL(targetURL);
                 }
-            }
+            // }
 
             // final check before making the request 
             if (isValidHostName(targetURL.hostname)) {

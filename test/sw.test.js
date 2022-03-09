@@ -255,48 +255,40 @@ async function handler(request) {
             }
         }
         // we might be handling a redirect passed from the server, so just pass it to the browser to handle it
-        if (!CURRENT_URL) {
+        if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
             return await fetch(request)
         }
-    }
-    
-    // let url // for some dammn reason, eslint.org used absolute urls when they could have just used relative. Blame them for this if statement
-
-    // if (
-    //     request.url.substring(
-    //         CROS_SERVER_ENDPOINT.length, 
-    //         CROS_SERVER_ENDPOINT.length + CURRENT_URL ) == CURRENT_URL){
-    //     url = request.url
-    // }
-    const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
-    
-    let response
-    if (url.match(/https?:\/\//g).length > 2) {
-        response = await fetch(newReq(
-            request,
-            request.url
-        ));
-    }else {
-        response = await fetch(newReq(
-            request,
-            CROS_SERVER_ENDPOINT +
-            url
-        ));
-    }
-    // console.log(response.headers.forEach(function (value, key) {
-    //     console.log(key + ': ' + value)
-    // }));
-    const contentType = response.headers.get('content-type');
-    if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
-        return new Response(await parseHTML(await response.text()), {
-            status: response.status,
-            statusText: response.statusText,
-            headers: new Headers(response.headers),
-        })
     }else{
-        return response;
+        console.log(request.url);
+        const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
+        
+        let response
+        if (url.match(/https?:\/\//g).length > 2) {
+            response = await fetch(newReq(
+                request,
+                request.url
+            ));
+        }else {
+            response = await fetch(newReq(
+                request,
+                CROS_SERVER_ENDPOINT +
+                url
+            ));
+        }
+        // console.log(response.headers.forEach(function (value, key) {
+        //     console.log(key + ': ' + value)
+        // }));
+        const contentType = response.headers.get('content-type');
+        if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
+            return new Response(await parseHTML(await response.text()), {
+                status: response.status,
+                statusText: response.statusText,
+                headers: new Headers(response.headers),
+            })
+        }else{
+            return response;
+        }
     }
-    
 }
 
 self.addEventListener('fetch',function (event) {
