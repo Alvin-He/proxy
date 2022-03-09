@@ -130,20 +130,23 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         port: targetURL.port || targetURL.protocol == 'http:' ? 80 : 443,
         path: (targetURL.pathname || '/') + (targetURL.search || ''),
         method: clientReq.method,
-        headers: clientReq.headers
+        headers: {}
     }
-    if (options.headers.host) {
-        options.headers.host = targetURL.hostname; 
-        // delete options.headers.host
-    }
-    if (options.headers.origin) {
-        options.headers.origin = targetURL.origin;
-        // delete options.headers.origin
-    }
-    if (options.headers.referer) {
-        options.headers.referer = targetURL.href; 
-        // delete options.headers.referer
-    }
+    let oldHeaders = clientReq.rawHeaders
+    let newHeaders = options.headers; 
+    oldHeaders.forEach((value, index) => {
+        if (index % 2 == 0) {
+            if (/host/i.test(value)) {
+                newHeaders[value] = targetURL.hostname;
+            } else if (/origin/i.test(value)) {
+                newHeaders[value] = targetURL.origin; // might need to have the client report it manually           
+            } else if (/referer/i.test(value)) {
+                newHeaders[value] = targetURL.href;            
+            }else{
+                newHeaders[value] = oldHeaders[index + 1]
+            }
+        }
+    });
 
     // console.log(options.headers)
     // http handling
@@ -172,6 +175,7 @@ function proxyRequest(targetURL, clientReq, clientRes) {
     }); 
     //end when the client ends the request
     clientReq.on('end', () => {
+        console.log('client req ended')
         proxyReq.end();
     })
 }
@@ -188,8 +192,12 @@ let totRedirs = 0
 function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     // console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
     const statusCode = proxyRes.statusCode;
+    
+    if (proxyRes.headers['Content-Location']) {
+        console.log(proxyRes.headers['Content-Location'])
+    }
 
-    if (statusCode >= 300 && statusCode < 400){ //redirect response handling
+    if (statusCode > 300 && statusCode < 400){ //redirect response handling, skipping 300 since it requires user agent(browser)
         const locationHeader = resolve(proxyReq.url.href, proxyRes.headers.location)
         if (locationHeader) {
             console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
@@ -208,29 +216,27 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
             proxyReq.destroy(); 
             
             proxyRequest(new URL (locationHeader), proxyReq, clientRes)
-            return false
         }
-        clientReq.meta += '/' + locationHeader; 
-    }
-    proxyRes.headers['Content-Security-Policy'] = 'default-src *';
-    proxyRes.headers['X-Frame-Options'] = 'SAMEORIGIN';
+    } else {
+        proxyRes.headers['Content-Security-Policy'] = 'default-src *';
+        proxyRes.headers['X-Frame-Options'] = 'SAMEORIGIN';
 
-    if (proxyRes.headers['Content-Security-Policy']) {
-        delete proxyRes.headers['Content-Security-Policy'];
-    }
-    proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
-    
+        if (proxyRes.headers['Content-Security-Policy']) {
+            delete proxyRes.headers['Content-Security-Policy'];
+        }
+        proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
+        
 
-    clientRes.writeHead(statusCode, proxyRes.headers);
-    proxyRes.on('data', (chunk) => {
-        clientRes.write(chunk)
-        // console.log(`BODY: ${chunk}`);
-    });
-    proxyRes.on('end', () => {
-        // console.log('No more data in response.');
-        clientRes.end()
-    });
-    
+        clientRes.writeHead(statusCode, proxyRes.headers);
+        proxyRes.on('data', (chunk) => {
+            clientRes.write(chunk)
+            // console.log(`BODY: ${chunk}`);
+        });
+        proxyRes.on('end', () => {
+            // console.log('No more data in response.');
+            clientRes.end()
+        });
+    }
 }
 
 // Listeners
