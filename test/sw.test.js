@@ -263,7 +263,7 @@ async function handler(request) {
         const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
         
         let response
-        if (url.match(/https?:\/\//g).length > 2) {
+        if (url.match(/https?:\/\//g).length >= 2) { // if there're 2 http(s):// then directly request it
             response = await fetch(newReq(
                 request,
                 request.url
