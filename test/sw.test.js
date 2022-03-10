@@ -112,17 +112,18 @@ self.addEventListener("message", async function (event){
             let response, status
             try {
                 // fetch and parse 
-                response = await parseHTML(await fetchDocument(url), url);
+                // response = await parseHTML(await fetchDocument(url), url);
+                await prefetchDocument(url);
                 status = 'ok';
             } catch (error) {
-                response = error
+                // response = error
                 status = 'error'
             }
             event.source.postMessage({
                 type : event.data.type,  
                 url : url,
                 status : status,
-                response : response
+                // response : response
             })
             
         }
@@ -172,6 +173,23 @@ async function notifyServer(identifier, target) {
 
 }
 
+// prefetch the document
+async function prefetchDocument(url) {
+    const res = await fetch(CROS_SERVER_ENDPOINT + url);
+
+    console.log(res)
+    if (res.redirected) {
+        console.log('redirected')
+        CURRENT_URL = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
+    }else {
+        console.log('not redirected'); 
+        CURRENT_URL = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
+    }
+    if (!/\/$/.test(CURRENT_URL)) {
+        CURRENT_URL = CURRENT_URL + '/';
+    }
+}
+
 /**
  * 
  * @param {String} htmlDocument 
@@ -179,6 +197,7 @@ async function notifyServer(identifier, target) {
  * @returns 
  */
 async function parseHTML(htmlDocument) {
+    if (htmlDocument.length < 1) return null; // if the document is empty, return null
     const buffer = new Array(6); 
     const bufferLength = buffer.length - 1;
     for (let i = 0; i < 6; i++) {
@@ -221,13 +240,11 @@ async function fetchDocument (url) {
 } 
 
 // loads the old request data to a new one
-function newReq(request,url) {
-    // let Jstring = '{ { "request-url":"' + url.toString() + '"}'
-    //     ',/n{ "' + key.toString() + '":"' + value.toString() + '" }'
-    // console.log(Jstring + '}')
+async function newReq(request,url) {
+    const body = await request.blob();
     return new Request(url ? url : request.url, {
         method: request.method, // probably the most important thing, don't want to have GET sent when we POST
-        body: request.body ? request.body : null,
+        body: body.length > 0 ? body : null,
         // mode: request.mode == 'navigate' ?  : request.mode,
         headers: request.headers,
         mode: request.mode == 'navigate' ? 'cors' : request.mode,
@@ -258,36 +275,45 @@ async function handler(request) {
         if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
             return await fetch(request)
         }
+    }; // tried to use else here but it somehow messed up the return values and caused 'undefined' behaviour
+    console.log(request.url);
+    const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
+    
+    let response
+    if (url.match(/https?:\/\//g).length > 2) {
+        // response = await fetch(await newReq(
+        //     request,
+        //     request.url
+        // ));
+        response = await fetch(request.url, {
+            method: request.method, // probably the most important thing, don't want to have GET sent when we POST
+            body: await request.blob(),
+            // mode: request.mode == 'navigate' ?  : request.mode,
+            headers: request.headers,
+            mode: request.mode == 'navigate' ? 'cors' : request.mode,
+            credentials: request.credentials,
+            redirect: request.redirect
+        }
+        );
+    }else {
+        response = await fetch(await newReq(
+            request,
+            CROS_SERVER_ENDPOINT +
+            url
+        ));
+    }
+    // console.log(response.headers.forEach(function (value, key) {
+    //     console.log(key + ': ' + value)
+    // }));
+    const contentType = response.headers.get('content-type');
+    if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
+        return new Response(await parseHTML(await response.text()), {
+            status: response.status,
+            statusText: response.statusText,
+            headers: new Headers(response.headers),
+        })
     }else{
-        console.log(request.url);
-        const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
-        
-        let response
-        if (url.match(/https?:\/\//g).length > 2) {
-            response = await fetch(newReq(
-                request,
-                request.url
-            ));
-        }else {
-            response = await fetch(newReq(
-                request,
-                CROS_SERVER_ENDPOINT +
-                url
-            ));
-        }
-        // console.log(response.headers.forEach(function (value, key) {
-        //     console.log(key + ': ' + value)
-        // }));
-        const contentType = response.headers.get('content-type');
-        if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
-            return new Response(await parseHTML(await response.text()), {
-                status: response.status,
-                statusText: response.statusText,
-                headers: new Headers(response.headers),
-            })
-        }else{
-            return response;
-        }
+        return response;
     }
 }
 

@@ -171,11 +171,11 @@ function proxyRequest(targetURL, clientReq, clientRes) {
     // copy over all the data, if the method has no request body and it sent a request body,
     // we can have the end server worry about it. Proxies, after all, are just a data copier
     clientReq.on('data', (chunk) => {
+        console.log(chunk.toString())
         proxyReq.write(chunk); 
     }); 
     //end when the client ends the request
     clientReq.on('end', () => {
-        console.log('client req ended')
         proxyReq.end();
     })
 }
@@ -206,6 +206,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
                 proxyRes.headers.location = locationHeader;
                 clientRes.writeHead(statusCode, proxyRes.headers);
                 proxyRes.on('data', (chunk) => {
+                    console.log(chunk.toString())
                     clientRes.write(chunk)
                     // console.log(`BODY: ${chunk}`);
                 });
@@ -216,6 +217,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
             }else{
                 clientRes.writeHead(statusCode, proxyRes.headers);
                 proxyRes.on('data', (chunk) => {
+                    console.log(chunk.toString())
                     clientRes.write(chunk)
                     // console.log(`BODY: ${chunk}`);
                 });
@@ -386,8 +388,8 @@ function requestListener(req, res) {
  * @param {Buffer} head 
  */
 function upgradeListener(req, clientSocket, head) {
-    console.log('upgrade');
-    console.log(req.url)
+    // console.log('upgrade');
+    // console.log(req.url)
     // console.log(head.toString('utf8'))
     // extract the identifier from the request url
     let path = req.url.substring(1).split('/');
@@ -402,8 +404,8 @@ function upgradeListener(req, clientSocket, head) {
         const uuid = identifierArray[3];
         if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
             const requestInfo = Array.from(SERVER_GLOBAL.LCPP[hash]); // copy the array 
-            console.log('INFO: ')
-            console.log(requestInfo);
+            // console.log('INFO: ')
+            // console.log(requestInfo);
             const client = requestInfo[0];
             const origin = new URL(requestInfo[1]);
             let target = new URL(requestInfo[2]);
@@ -411,7 +413,7 @@ function upgradeListener(req, clientSocket, head) {
             // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
             //&& Number(new Date()) - Number(time) < 60000
             if (client == uuid ) { // id and time out 
-                console.log('LCPP-OK')
+                // console.log('LCPP-OK')
                 delete SERVER_GLOBAL.LCPP[hash]; // delete the hash from the LCPP
                 // wsRedirect(target, origin, req.headers, clientSocket);
                 const proxySocket = tls.connect({
@@ -429,20 +431,17 @@ function upgradeListener(req, clientSocket, head) {
                         if (index % 2 == 0) {
                             if (/host/i.test(value)) {
                                 proxySocket.write(value + ': ' + target.hostname + '\r\n');
-                                console.log(value + ': ' + target.hostname);
                             } else if (/origin/i.test(value)) {
                                 proxySocket.write(value + ': ' + origin.origin + '\r\n');
-                                console.log(value + ': ' + origin.origin);
                             } else if (/cookie/i.test(value)) {
                                 ; // do nothing 
                             }else{
                                 proxySocket.write(value + ': ' + req.rawHeaders[index + 1] + '\r\n');
-                                console.log(value + ': ' + req.rawHeaders[index + 1]);
                             }
                         }
                     });
                     proxySocket.write('\r\n'); // end of headers
-                    console.log('request sent');
+                    // console.log('request sent');
 
                     // socket.write(head); // write the request body from the client 
                     proxySocket.pipe(clientSocket);
@@ -450,14 +449,6 @@ function upgradeListener(req, clientSocket, head) {
                     
                 });
                 if (SSL_KEY_LOG_FILE) {proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));}
-                proxySocket.on('data', (data) => {
-                    console.log('Target server incoming:')
-                    console.log(data.toString());
-                })
-                clientSocket.on('data', (data) => {
-                    console.log('Client incoming:')
-                    console.log(data.toString());
-                })
                 proxySocket.on('close', () => {
                     clientSocket.destroy();
                 });

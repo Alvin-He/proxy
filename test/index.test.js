@@ -24,7 +24,8 @@ navigator.serviceWorker.addEventListener('message', (event) => {
             // loads callback for the according url
             if (serviceWorkerFetchs[event.data.url] 
             && typeof serviceWorkerFetchs[event.data.url] == 'function') {
-                serviceWorkerFetchs[event.data.url](event.data.response, event.data.status)
+                // serviceWorkerFetchs[event.data.url](event.data.response, event.data.status)
+                serviceWorkerFetchs[event.data.url](event.data.status)
             }
         }
     }
@@ -32,26 +33,26 @@ navigator.serviceWorker.addEventListener('message', (event) => {
 
 function doCORSRequest() {
     let url = document.getElementById('Url').value; 
-    //create callback
-    // serviceWorkerFetchs[url] = (response, status) => {
-    //     console.log("GET" + ' ' + url + ' ' + status);
-    //     // window.document.getElementsByTagName('html')[0].innerHTML = "";
-    //     if (status == 'ok') {
+    //create callback          response, 
+    serviceWorkerFetchs[url] = (status) => {
+        console.log("GET" + ' ' + url + ' ' + status);
+        // window.document.getElementsByTagName('html')[0].innerHTML = "";
+        if (status == 'ok') {
             // updates the current url 
-            navigator.serviceWorker.controller.postMessage({
-                type: 'UPDATE_CURRENT_URL',
-                url : url
-            })
+            // navigator.serviceWorker.controller.postMessage({
+            //     type: 'UPDATE_CURRENT_URL',
+            //     url : url
+            // })
             window.location.href = 'https://' + window.location.host + '/'
             // let newWindow = window.open('https://127.0.0.1:3000')
             // newWindow.document.write(response)
             // newWindow.document.scripts.
-        // }
+        }
 
-    // }
+    }
     // tell the serviceWorker to initiate the request 
-    // navigator.serviceWorker.controller.postMessage({
-    //     type : 'FETCH_DOCUMENT', 
-    //     url : url
-    // })
+    navigator.serviceWorker.controller.postMessage({
+        type : 'FETCH_DOCUMENT', 
+        url : url
+    })
 }
