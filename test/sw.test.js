@@ -240,17 +240,31 @@ async function fetchDocument (url) {
 } 
 
 // loads the old request data to a new one
-async function newReq(request,url) {
+async function newReq(request) { // ,url
     const body = await request.blob();
-    return new Request(url ? url : request.url, {
-        method: request.method, // probably the most important thing, don't want to have GET sent when we POST
-        body: body.length > 0 ? body : null,
-        // mode: request.mode == 'navigate' ?  : request.mode,
+     
+    return {
+        method: request.method,
         headers: request.headers,
-        mode: request.mode == 'navigate' ? 'cors' : request.mode,
+        body: body.length > 0 ? body : undefined, 
+        mode: request.mode == 'navigate' ? 'cors' : request.mode, 
         credentials: request.credentials,
-        redirect: request.redirect
-    });
+        cache: '', 
+        redirect: request.redirect,
+
+    }
+
+    // return new Request(url ? url : request.url, {
+    //     method: request.method, // probably the most important thing, don't want to have GET sent when we POST
+    //     body: body.length > 0 ? body : null,
+    //     // mode: request.mode == 'navigate' ?  : request.mode,
+    //     headers: request.headers,
+    //     mode: request.mode == 'navigate' ? 'cors' : request.mode,
+    //     credentials: request.credentials,
+    //     redirect: request.redirect
+    // });
+
+
 }
 
 const localResource = [ // local resource that the client can access
@@ -285,22 +299,9 @@ async function handler(request) {
         //     request,
         //     request.url
         // ));
-        response = await fetch(request.url, {
-            method: request.method, // probably the most important thing, don't want to have GET sent when we POST
-            body: await request.blob(),
-            // mode: request.mode == 'navigate' ?  : request.mode,
-            headers: request.headers,
-            mode: request.mode == 'navigate' ? 'cors' : request.mode,
-            credentials: request.credentials,
-            redirect: request.redirect
-        }
-        );
+        response = await fetch(request.url, await newReq(request));
     }else {
-        response = await fetch(await newReq(
-            request,
-            CROS_SERVER_ENDPOINT +
-            url
-        ));
+        response = await fetch(CROS_SERVER_ENDPOINT + url, await newReq(request));
     }
     // console.log(response.headers.forEach(function (value, key) {
     //     console.log(key + ': ' + value)
