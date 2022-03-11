@@ -388,7 +388,7 @@ function requestListener(req, res) {
  * @param {Buffer} head 
  */
 function upgradeListener(req, clientSocket, head) {
-    console.log('upgrade');
+    // console.log('upgrade');
     console.log(req.url)
     // console.log(head.toString('utf8'))
     // extract the identifier from the request url
@@ -404,7 +404,7 @@ function upgradeListener(req, clientSocket, head) {
         const uuid = identifierArray[3];
         if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
             const requestInfo = Array.from(SERVER_GLOBAL.LCPP[hash]); // copy the array 
-            console.log('INFO: ')
+            // console.log('INFO: ')
             console.log(requestInfo);
             const client = requestInfo[0];
             const origin = new URL(requestInfo[1]);
@@ -441,15 +441,15 @@ function upgradeListener(req, clientSocket, head) {
                         }
                     });
                     proxySocket.write('\r\n'); // end of headers
-                    console.log('request sent');
+                    // console.log('request sent');
 
                     // socket.write(head); // write the request body from the client 
                     proxySocket.pipe(clientSocket);
                     clientSocket.pipe(proxySocket);
                     
                 });
-                proxySocket.on('data', (data) => {console.log( 'Target Incoming: ', data.toString())});
-                clientSocket.on('data', (data) => {console.log( 'client Incoming: ', data.toString())});
+                // proxySocket.on('data', (data) => {console.log( 'Target Incoming: ', data.toString())});
+                // clientSocket.on('data', (data) => {console.log( 'client Incoming: ', data.toString())});
                 if (SSL_KEY_LOG_FILE) {proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));}
                 proxySocket.on('close', () => {
                     clientSocket.destroy();

@@ -246,7 +246,7 @@ async function newReq(request) { // ,url
     return {
         method: request.method,
         headers: request.headers,
-        body: body.length > 0 ? body : null, 
+        body: body.size > 0 ? body : null, 
         mode: request.mode == 'navigate' ? 'cors' : request.mode, 
         credentials: request.credentials,
         // cache: '', 
