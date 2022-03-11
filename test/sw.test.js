@@ -246,10 +246,10 @@ async function newReq(request) { // ,url
     return {
         method: request.method,
         headers: request.headers,
-        body: body.length > 0 ? body : undefined, 
+        body: body.length > 0 ? body : null, 
         mode: request.mode == 'navigate' ? 'cors' : request.mode, 
         credentials: request.credentials,
-        cache: '', 
+        // cache: '', 
         redirect: request.redirect,
 
     }

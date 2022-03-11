@@ -65,7 +65,7 @@ class ws extends EventTarget {
 
         this.CONNECTING = 0
         this.OPEN = 1
-        this.CLOSING = 2,
+        this.CLOSING = 2
         this.CLOSED = 3
 
         sw.addEventListener('message', (event) => {
