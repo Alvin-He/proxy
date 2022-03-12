@@ -10,7 +10,7 @@ const fs = require('fs');
 const { URL } = require('url');
 const { createHash } = require('crypto');
 const localResource = [ // local resource that the client can access
-    'ws.js',
+    'ws.test.js',
     'index.test.js',
     'test.html', 
     'sw.test.js'

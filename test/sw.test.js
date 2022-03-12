@@ -208,7 +208,7 @@ async function parseHTML(htmlDocument) {
         if (buffer.join('') == '<head>') { // check if we found the header we wanted
             // insert at the next length 
             htmlDocument = htmlDocument.slice(0, i) + 
-            '<script src="/ws.js"></script>' +
+            '<script src="/ws.test.js"></script>' +
             htmlDocument.slice(i); 
             break;
         }
@@ -268,7 +268,7 @@ async function newReq(request) { // ,url
 }
 
 const localResource = [ // local resource that the client can access
-    'ws.js',
+    'ws.test.js',
     'index.test.js',
     'test.html',
     'sw.test.js'
