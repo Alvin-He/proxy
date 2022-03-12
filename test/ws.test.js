@@ -164,13 +164,16 @@ class obj extends EventTarget {
     get readyState() { return this.properties.readyState }; // possible modification by sw
     get url() { return this.properties.url };
 
-    set onclose(fn) { this.addEventListener('close', this.listeners.onclose = fn)};
+    set onclose(fn) { this.removeEventListener('close', this.listeners.onclose); this.addEventListener('close', this.listeners.onclose = fn);};
     get onclose() { return this.listeners.onclose };
-    set onopen(fn) { this.addEventListener('open', this.listeners.onclose = fn)};
+
+    set onopen(fn) { this.removeEventListener('open', this.listeners.onopen); this.addEventListener('open', this.listeners.onopen = fn);};
     get onopen() { return this.listeners.onopen };
-    set onerror(fn) { this.addEventListener('error', this.listeners.onclose = fn)};
+    
+    set onerror(fn) { this.removeEventListener('error', this.listeners.onerror); this.addEventListener('error', this.listeners.onerror = fn)};
     get onerror() { return this.listeners.onerror };
-    set onmessage(fn) { this.addEventListener('message', this.listeners.onclose = fn)};
+    
+    set onmessage(fn) { this.removeEventListener('message', this.listeners.onmessage); this.addEventListener('message', this.listeners.onmessage = fn)};
     get onmessage() { return this.listeners.onmessage };
 
     constructor(url, protocols) {
