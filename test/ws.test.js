@@ -145,18 +145,23 @@ class ws extends EventTarget {
     }
 }
 
-WebSocket = ws;
-console.log('WebSocket overwritten')
-
-
 class obj extends EventTarget {
     static CONNECTING = 0;
     static OPEN = 1;
     static CLOSING = 2;
     static CLOSED = 3;
 
-    get binaryType() { return this.properties.binaryType }; // possible modification by sw
-    set binaryType(type) { this.properties.binaryType = type };
+    get binaryType() { return this.properties.binaryType }; // possible modification by client
+    set binaryType(type) { 
+        // sw.controller.postMessage({
+        //     type: 'WEB_SOCKET_DATA',
+        //     id: this.SOCKET_IDENTIFIER,
+        //     data: {
+        //         binaryType: type
+        //     }
+        // })
+        this.properties.binaryType = type
+    };
 
     get bufferedAmount() { return this.properties.bufferedAmount }; // possible modification by sw
     get extensions() { return this.properties.extensions };
@@ -223,7 +228,7 @@ class obj extends EventTarget {
             })
         }
 
-        sw.addEventListener('message', (event) => {
+        sw.addEventListener('message', async (event) => {
             if (event.data) {
                 const data = event.data;
                 const id = data.SOCKET_ID;
@@ -243,12 +248,17 @@ class obj extends EventTarget {
                         console.log(data.error)
                     }
 
-
+                } else if (data.type == 'WEB_SOCKET_UPDATE') {
+                    const data = event.data.socket;
+                    console.log('Socket Update: ', data.socket)
+                    // copy the data from the sw to this object that are modifidable
+                    this.properties.bufferedAmount = data.socket.bufferedAmount;
+                    this.properties.readyState = data.socket.readyState;
                 } else if (data.type == 'WEB_SOCKET_message') {
                     console.log('Socket Message ID: ' + id)
                     console.log(data.event)
                     this.dispatchEvent(new MessageEvent('message', {
-                        data: data.event.data,
+                        data: this.properties.binaryType == 'blob' ? data.event.data : await data.event.data.arrayBuffer(),
                         origin: this.properties.url,
                         lastEventId: data.event.lastEventId,
                         source: window.document.defaultView
@@ -288,3 +298,7 @@ class obj extends EventTarget {
 
     }
 }
+
+
+WebSocket = obj;
+console.log('WebSocket overwritten')

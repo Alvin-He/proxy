@@ -22,9 +22,9 @@ self.addEventListener('install', function (event) {
 
 self.addEventListener("message", async function (event){
     if (event.data){
+        const client = event.source;
         if (event.data.type == 'WEB_SOCKET_INIT') {
             console.log('WEB_SOCKET_INIT')
-            const client = event.source;
             const id = currentID++; 
             try {
                 if (webSockets[id] != undefined) { throw 'Web socket with id: ' + id + 'already exist.'}
@@ -102,8 +102,23 @@ self.addEventListener("message", async function (event){
             }
 
         }else if (event.data.type == 'WEB_SOCKET_send') {
-            webSockets[event.data.id].send(event.data.data);
-            
+            const socket = webSockets[event.data.id]
+            socket.send(event.data.data);
+            // rapidly update the client about the websocket's buffer amount until we hit 0
+            let iteration = 0;
+            const loop = setInterval(() => {
+                if (socket.bufferedAmount > 0 && socket.readyState == 1) {
+                    console.log('iteration ' + iteration++ + ' bufferedAmount: ' + socket.bufferedAmount);
+                    client.postMessage({
+                        type: 'WEB_SOCKET_update',
+                        socket: {
+                            bufferedAmount: socket.bufferedAmount,
+                        }
+                    });
+                } else {
+                    clearInterval(loop);
+                }
+            }, 100);
         }else if (event.data.type == 'WEB_SOCKET_close') {
             webSockets[event.data.id].close(event.data.code, event.data.reason);
         }else if (event.data.type == 'FETCH_DOCUMENT'){
@@ -137,6 +152,11 @@ self.addEventListener("message", async function (event){
     }
      
 })
+
+// update the client about the websocket
+function ws_update(socket, client, interval) {
+    
+}
 
 // generates an identifier in the form of LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
 async function generateIdentifier(host, origin) {
