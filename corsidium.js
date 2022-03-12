@@ -1,44 +1,62 @@
 // The birthplace of Corsidium, if I can ever finish it
-// infDev
+// v0.0.2
 /* TODO: 
     DONE Set up the proxy, 
     DONE support basic redirect & removeal of CORS headers, 
+    DONE web socket connections?!, 
 
-    Ya, short polling the requests don't looks like the way togo. I probably need to use
-    something like socket io, otherwise I gonna get 400s
+    new tab redirects,
+    cookies,
+    local storage,
+    session storage, 
+    session dataBase(IndexedDB)??,
+    web SQL??,
+    cache storage???
 
-
-    cookies???,
-    web socket connections?! 
+    as of v0.0.2, the load speed of https://discord.com/app is about 5 seconds 
 
     Things that gotta be supported:
     Gmail, Discord, Reddit, IG, Twitch??
 
     if possible, get it near the speed of Palladium: https://github.com/LudicrousDevelopment/Palladium.git
 */
+
 'use strict';
 
-const net = require('net')
-const http = require('http')
-const https = require('https')
+const net = require('net');
+const tls = require('tls');
+const http = require('http');
+const https = require('https');
 const regexp_tld = require('./lib/regexp-top-level-domain');
 const fs = require('fs');
 const { URL } = require('url');
+const { createHash } = require('crypto');
 const localResource = [ // local resource that the client can access
-    'index.html',
+    'ws.js',
+    'index.js',
     'client.html', 
-    'cros-proxy-service-worker.js'
+    'service-worker.js'
 ]
+
+const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 const ENGINE = process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS ? 'GLITCH' : process.env.XDG_CONFIG_HOME ? 'REPLIT' : 'NATIVE'
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
-const DIR_PATH = ENGINE == 'NATIVE' ? './' : './proxy/';
- 
+const DIR_PATH = './' //process.env.DIR_PATH ? process.env.DIR_PATH : (ENGINE == 'NATIVE' ? './' : './');
+const SSL_KEY_LOG_FILE = process.env.SSLKEYLOGFILE ? fs.createWriteStream(process.env.SSLKEYLOGFILE, { flags: 'a' }) : null;
+if (SSL_KEY_LOG_FILE) { process.on('exit', () => SSL_KEY_LOG_FILE.end()); } // close the log file
+
 const CROS_MAX_AGE = 0
 
+let SERVER_GLOBAL = {//  0   ,     1     ,      2    ,            3 
+    LCPP: { // hash : [client, origin url, target url, server unix time stamp]
+
+    },
+}
+
 function localServerResponse(path, clientRes) {
-    console.log("Local Resource Request: " + path); 
+    // console.log("Local Resource Request: " + path); 
     fs.readFile(DIR_PATH + path, 'utf8', function(error, data) {
         if (error) {
             console.error(error);
@@ -52,7 +70,7 @@ function localServerResponse(path, clientRes) {
             })
             clientRes.write(data);
             clientRes.end()
-            console.log('STATUS: 200')
+            // console.log('STATUS: 200')
         }
     });
 }
@@ -64,18 +82,6 @@ function isValidHostName(hostname) {
         net.isIP(hostname)) // if previous failed, check for ip addrress
     );
 }
-
-function getCurrentUrlFromCookie (cookieString) {
-    if (cookieString) {
-        for (const cookie of cookieString.split(';')){
-            const parts = cookie.match(/(.*)?=(.*)?/)
-            if (parts && parts[1].trim() == "CURRENT_URL") {
-                console.log('Current Url: ' + parts[2]);
-                return parts[2].trim()
-            }
-        };
-    }
-};
 
 // url.resolve in WHATWG URL API
 function resolve(from, to) {
@@ -123,7 +129,6 @@ function withCORS(headers, request) {
  * @param {http.IncomingMessage} clientReq Request sent from the client 
  * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
-let totErr = 0
 function proxyRequest(targetURL, clientReq, clientRes) {
     // console.log('Proxying: ' + targetURL)
     // clientReq.meta.location += targetURL.href; 
@@ -132,22 +137,25 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         protocol: targetURL.protocol || 'http:',
         // default port based on protocols(http:80 https:443)
         port: targetURL.port || targetURL.protocol == 'http:' ? 80 : 443,
-        path: targetURL.pathname || '/',
+        path: (targetURL.pathname || '/') + (targetURL.search || ''),
         method: clientReq.method,
-        headers: clientReq.headers
+        headers: {}
     }
-    if (options.headers.host) {
-        options.headers.host = targetURL.hostname; 
-        // delete options.headers.host
-    }
-    if (options.headers.origin) {
-        options.headers.origin = targetURL.origin;
-        // delete options.headers.origin
-    }
-    if (options.headers.referer) {
-        options.headers.referer = targetURL.href; 
-        // delete options.headers.referer
-    }
+    const oldHeaders = clientReq.rawHeaders
+    let newHeaders = options.headers; 
+    oldHeaders.forEach((value, index) => {
+        if (index % 2 == 0) {
+            if (/host/i.test(value)) {
+                newHeaders[value] = targetURL.hostname;
+            } else if (/origin/i.test(value)) {
+                newHeaders[value] = targetURL.origin; // might need to have the client report it manually
+            } else if (/referer/i.test(value)) {
+                newHeaders[value] = targetURL.href;
+            }else{
+                newHeaders[value] = oldHeaders[index + 1]
+            }
+        }
+    });
 
     // console.log(options.headers)
     // http handling
@@ -159,7 +167,6 @@ function proxyRequest(targetURL, clientReq, clientRes) {
     }
     proxyReq.setTimeout(6000, () => {
         console.log('TIME OUT!!!!!/t')
-        totErr += 1;
         proxyReq.end(); 
     });
     proxyReq.url = targetURL;
@@ -172,6 +179,7 @@ function proxyRequest(targetURL, clientReq, clientRes) {
     // copy over all the data, if the method has no request body and it sent a request body,
     // we can have the end server worry about it. Proxies, after all, are just a data copier
     clientReq.on('data', (chunk) => {
+        console.log(chunk.toString())
         proxyReq.write(chunk); 
     }); 
     //end when the client ends the request
@@ -188,43 +196,22 @@ function proxyRequest(targetURL, clientReq, clientRes) {
  * @param {http.IncomingMessage} clientReq Request sent from the client 
  * @param {http.ServerResponse} clientRes Response that's going to be sent to the client
  */
-let totRedirs = 0
 function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     // console.log(`HEADERS: ${JSON.stringify(proxyRes.headers)}`);
     const statusCode = proxyRes.statusCode;
 
-    if (statusCode >= 300 && statusCode < 400){ //redirect response handling
-        const locationHeader = resolve(proxyReq.url.href, proxyRes.headers.location)
-        if (locationHeader) {
-            console.log('Redirecting ' + proxyReq.url + ' ->TO-> ' + locationHeader)
-            totRedirs += 1; 
-            proxyReq.meta = clientReq.meta; 
-            proxyReq.headers = clientReq.headers; // copy over the initial request headers
-            // Remove all listeners (=reset events to initial state)
-            clientReq.removeAllListeners();
-            // clientReq.addListener('error')
-            
-            // Remove the error listener so that the ECONNRESET "error" that may occur after aborting a request does not propagate to res. 
-            // Not sure if this will happen, but since request.destroy is made with the same functionality as request.abort, it's better sorry than '404'.
-            // https://github.com/nodejitsu/node-http-proxy/blob/v1.11.1/lib/http-proxy/passes/web-incoming.js#L134
-            proxyReq.removeAllListeners('error');
-            proxyReq.once('error', () => {}); 
-            proxyReq.destroy(); 
-            
-            proxyRequest(new URL (locationHeader), proxyReq, clientRes)
-            return false
+    if (statusCode > 300 && statusCode < 400){ //redirect response handling, skipping 300 since it requires user agent(browser)
+        let locationHeader = proxyRes.headers.location //resolve(proxyReq.url.href, proxyRes.headers.location)
+        if (locationHeader && /^https?:\/\//.test(locationHeader)) {
+            locationHeader = 'https://127.0.0.1:3000/' + locationHeader;
+            console.log('Redirecting to: ' + locationHeader)
+            proxyRes.headers.location = locationHeader;
         }
-        clientReq.meta += '/' + locationHeader; 
-    }
-    proxyRes.headers['Content-Security-Policy'] = 'default-src *';
-    proxyRes.headers['X-Frame-Options'] = 'SAMEORIGIN';
+    } else {
+        proxyRes.headers['x-frame-options'] = 'SAMEORIGIN';
 
-    if (proxyRes.headers['Content-Security-Policy']) {
-        delete proxyRes.headers['Content-Security-Policy'];
+        proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
     }
-    proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
-    
-
     clientRes.writeHead(statusCode, proxyRes.headers);
     proxyRes.on('data', (chunk) => {
         clientRes.write(chunk)
@@ -249,9 +236,6 @@ function requestListener(req, res) {
     // res.on('finish', ()=> {console.log('<-' + res.statusCode + ' ' + req.method + ' ' + req.url);});
     req.meta = { // meta data, used by the proxy
         redirectCount: 0,
-        location: getCurrentUrlFromCookie(req.headers.cookie),
-        // baseURL : ''
-
     };
 
 
@@ -263,35 +247,51 @@ function requestListener(req, res) {
         res.end();
         console.log('Preflight Request Responded: ' + req.url);
         return true;
+    } else if (req.method === 'POST' && req.url === '/LCPP') {
+        console.log('LCPP Registration')
+        let body = '';
+        req.on('data', (data) => {
+            body += data.toString();
+        })
+        req.on('end', () => {
+            if (req.headers['content-type'] == 'application/json') {
+                let json = JSON.parse(body);
+                console.log(json)
+                if (json) {
+                    const target = json.target ? json.target : undefined;
+                    const origin = json.origin ? json.origin : undefined;
+                    if (origin && target) {
+                        const identifier = json.identifier ? json.identifier : undefined;
+                        if (identifier && /^LCPP-.*-\d*-.*-CROS$/.test(identifier)) {
+                            const identifierArray = identifier.split('-');
+                            const hash = identifierArray[1];
+                            if (!SERVER_GLOBAL.LCPP[hash]) {
+                                const time = Number(new Date); // generate time stamp based on server time, can't always trust the client
+                                const uuid = identifierArray[3];
+
+                                SERVER_GLOBAL.LCPP[hash.toString()] = [uuid, origin, target, time];
+
+                                res.writeHead(201, {'Location': '/LCPP/' + identifier});
+                                res.end();
+                                console.log('LCPP Registration Successful: ' + identifier);
+                                return true; 
+            }   }   }   }   }// else 
+            res.statusCode = 400;
+            res.end();
+        });
     } else {
         let targetURL
 
         try {
-            // p-document-get overrides cookies and local resource
-            if (req.headers['p-document-get']) { 
-                targetURL = new URL(req.headers['p-document-get']);
-
-            } else { 
-                targetURL = req.url.substring(1);
-                // local resource loading, local resource overrides cookies
-                for (const path of localResource) {
-                    if (path == targetURL) {
-                        localServerResponse(path, res);
-                        return true;
-                    }
-                }
-                // CURRENT_URL cookie handling
-                // add the current url if present and it's not the current request url
-                if (req.meta.location && req.meta.location != targetURL) { 
-                    targetURL = new URL(
-                        (/\/$/.test(req.meta.location) ?
-                            req.meta.location : req.meta.location + '/')
-                        + targetURL);
-                // Direct URL path proxy request handling 
-                } else {
-                    targetURL = new URL(targetURL);
+            targetURL = req.url.substring(1);
+            // local resource loading, local resource overrides cookies
+            for (const path of localResource) {
+                if (path == targetURL) {
+                    localServerResponse(path, res);
+                    return true;
                 }
             }
+            targetURL = new URL(targetURL);
 
             // final check before making the request 
             if (isValidHostName(targetURL.hostname)) {
@@ -315,10 +315,109 @@ function requestListener(req, res) {
         } catch (error) { // this'll fire when new URL (targetURL) errored; In case we get an invalid URL
             res.writeHead(404, 'Invalid URL');
             res.end('Invalid URL ' + targetURL);
-            // console.log('Invalid URL ' + targetURL);
+            console.log('Invalid URL ' + targetURL);
             return false;
         }
     }
+}
+
+/**
+ * 
+ * @param {http.IncomingMessage} req 
+ * @param {net.Socket} clientSocket 
+ * @param {Buffer} head 
+ */
+function upgradeListener(req, clientSocket, head) {
+    // console.log('upgrade');
+    console.log(req.url)
+    // extract the identifier from the request url
+    let path = req.url.substring(1).split('/');
+    const identifier = path.pop();
+    // const url = path.join('/'); // the target url
+
+    // LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
+    if (/^LCPP-.*-\d*-.*-CROS$/.test(identifier)) {
+        const identifierArray = identifier.split('-');
+        const hash = identifierArray[1];
+        const time = identifierArray[2];
+        const uuid = identifierArray[3];
+        if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
+            const requestInfo = Array.from(SERVER_GLOBAL.LCPP[hash]); // copy the array 
+            // console.log('INFO: ')
+            console.log(requestInfo);
+            const client = requestInfo[0];
+            const origin = new URL(requestInfo[1]);
+            let target = new URL(requestInfo[2]);
+            const port = target.port || target.protocol == 'wss:' ? 443 : 80;
+            // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
+            //&& Number(new Date()) - Number(time) < 60000
+            if (client == uuid ) { // id and time out 
+                console.log('LCPP-OK')
+                delete SERVER_GLOBAL.LCPP[hash]; // delete the hash from the LCPP
+                // wsRedirect(target, origin, req.headers, clientSocket);
+                const proxySocket = tls.connect({
+                    isServer: false,
+                    host: target.hostname,
+                    port: port,
+                    // rejectUnauthorized: false,
+                    servername: target.hostname,
+                }, () => {
+                // const proxySocket = net.createConnection(port, target.hostname, () => {
+
+                    // TODO: generate a websocket upgrade request since we already used it
+                    proxySocket.write('GET ' + target.href + ' HTTP/1.1\r\n'); // let the server know we are upgrading
+                    req.rawHeaders.forEach((value, index) => {
+                        if (index % 2 == 0) {
+                            if (/host/i.test(value)) {
+                                proxySocket.write(value + ': ' + target.hostname + '\r\n');
+                            } else if (/origin/i.test(value)) {
+                                proxySocket.write(value + ': ' + origin.origin + '\r\n');
+                            } else if (/cookie/i.test(value)) {
+                                ; // do nothing 
+                            }else{
+                                proxySocket.write(value + ': ' + req.rawHeaders[index + 1] + '\r\n');
+                            }
+                        }
+                    });
+                    proxySocket.write('\r\n'); // end of headers
+                    // console.log('request sent');
+
+                    // socket.write(head); // write the request body from the client 
+                    proxySocket.pipe(clientSocket);
+                    clientSocket.pipe(proxySocket);
+                    
+                });
+                // proxySocket.on('data', (data) => {console.log( 'Target Incoming: ', data.toString())});
+                // clientSocket.on('data', (data) => {console.log( 'client Incoming: ', data.toString())});
+                if (SSL_KEY_LOG_FILE) {proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));}
+                proxySocket.on('close', () => {
+                    clientSocket.destroy();
+                });
+                // proxySocket.on('')
+                clientSocket.on('close', () => {
+                    proxySocket.destroy();
+                });
+            }
+        }
+    } else {
+        console.log('LCPP-ERROR')
+        clientSocket.destroy();
+    }
+
+    // const key = req.headers['sec-websocket-key'] ? req.headers['sec-websocket-key'] : abortHandshake(clientSocket, 400)
+
+    // const digest = createHash('sha1').update(key + WS_GUID).digest('base64')
+
+    // clientSocket.write(
+    // 'HTTP/1.1 101 Switching Protocols\r\n' +
+    // 'Upgrade: websocket\r\n' + 
+    // 'Connection: Upgrade\r\n' + 
+    // 'Sec-WebSocket-Accept: ' + digest + '\r\n' +
+    // '\r\n');
+
+    // clientSocket.on('data', (buffer) => {
+    //     console.log(buffer.readBigUInt64LE())
+    // })
 }
 
 // Async calls 
@@ -330,13 +429,14 @@ function requestListener(req, res) {
     // Create the server
     const proxy = ENGINE == 'NATIVE' ? 
         https.createServer({
-            key: fs.readFileSync(DIR_PATH + 'test/key.pem'),
-            cert: fs.readFileSync(DIR_PATH + 'test/cert.pem')
+            key: fs.readFileSync( DIR_PATH + 'test/key.pem' ),
+            cert: fs.readFileSync(DIR_PATH + 'test/cert.pem'),
         }) 
         : http.createServer() // we use http on on non Natvie engines because it's already https by default
         
     // add listeners 
     proxy.on('request', requestListener);
+    proxy.on('upgrade', upgradeListener); 
 
     // boot the server
     proxy.listen(PORT, HOST, () => {

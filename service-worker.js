@@ -1,4 +1,4 @@
-const CROS_SERVER_ENDPOINT = serviceWorker.scriptURL.substring(0, serviceWorker.scriptURL.length - 10); //'https://cros-proxy-testing.glitch.me/'
+const CROS_SERVER_ENDPOINT = serviceWorker.scriptURL.substring(0, serviceWorker.scriptURL.length - 'service-worker.js'.length); //'https://cros-proxy-testing.glitch.me/'
 let CURRENT_URL = "";
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
 
@@ -7,6 +7,12 @@ let webSockets = {
     0: null, // 0 is the default websocket(null);
 };
 
+const localResource = [ // local resource that the client can access
+    'ws.js',
+    'index.js',
+    'client.html',
+    'service-worker.js'
+]
 
 // Escaping a string into a regexp, https://stackoverflow.com/a/494122
 RegExp.escape = function (str) {
@@ -19,6 +25,8 @@ self.addEventListener('install', function (event) {
     console.log('Service worker installed.');
     self.skipWaiting();
 });
+
+let isLoopActive = false;
 
 self.addEventListener("message", async function (event){
     if (event.data){
@@ -81,11 +89,11 @@ self.addEventListener("message", async function (event){
                         status: 'ok',
                         SOCKET_ID: id,
                         socket: {
-                            binaryType: socket.binaryType,
-                            bufferedAmount: socket.bufferedAmount,
+                            // binaryType: socket.binaryType,
+                            // bufferedAmount: socket.bufferedAmount,
                             extensions: socket.extensions,
                             protocol: socket.protocol,
-                            readyState: socket.readyState,
+                            // readyState: socket.readyState,
                             url: event.data.url
                         }
                     });
@@ -105,20 +113,25 @@ self.addEventListener("message", async function (event){
             const socket = webSockets[event.data.id]
             socket.send(event.data.data);
             // rapidly update the client about the websocket's buffer amount until we hit 0
-            let iteration = 0;
-            const loop = setInterval(() => {
-                if (socket.bufferedAmount > 0 && socket.readyState == 1) {
-                    console.log('iteration ' + iteration++ + ' bufferedAmount: ' + socket.bufferedAmount);
-                    client.postMessage({
-                        type: 'WEB_SOCKET_update',
-                        socket: {
-                            bufferedAmount: socket.bufferedAmount,
-                        }
-                    });
-                } else {
-                    clearInterval(loop);
-                }
-            }, 100);
+            if (!isLoopActive) { // one instance of loop at any given time
+                const loop = setInterval(() => {
+                    isLoopActive = true;
+                    if (socket.bufferedAmount > 0 && socket.readyState == 1) {
+                        console.log('iteration ' + iteration++ + ' bufferedAmount: ' + socket.bufferedAmount);
+                        client.postMessage({
+                            type: 'WEB_SOCKET_UPDATE',
+                            data: socket.bufferedAmount,
+                        });
+                    } else {
+                        clearInterval(loop);
+                        client.postMessage({
+                            type: 'WEB_SOCKET_UPDATE',
+                            data: 0,
+                        });
+                        isLoopActive = false;
+                    }
+                }, 100);
+            }
         }else if (event.data.type == 'WEB_SOCKET_close') {
             webSockets[event.data.id].close(event.data.code, event.data.reason);
         }else if (event.data.type == 'FETCH_DOCUMENT'){
@@ -141,8 +154,7 @@ self.addEventListener("message", async function (event){
                 // response : response
             })
             
-        }
-        if (event.data.type == 'UPDATE_CURRENT_URL') {
+        }else if (event.data.type == 'UPDATE_CURRENT_URL') {
             if (/\/$/.test(event.data.url)) {
                 CURRENT_URL = event.data.url;
             }else{
@@ -153,10 +165,11 @@ self.addEventListener("message", async function (event){
      
 })
 
-// update the client about the websocket
-function ws_update(socket, client, interval) {
-    
-}
+self.addEventListener('fetch', function (event) {
+    // console.log(event.request.method + ' ' + event.request.url);
+    // console.log(JSON.stringify(event.request))
+    event.respondWith(handler(event.request));
+});
 
 // generates an identifier in the form of LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
 async function generateIdentifier(host, origin) {
@@ -228,7 +241,7 @@ async function parseHTML(htmlDocument) {
         if (buffer.join('') == '<head>') { // check if we found the header we wanted
             // insert at the next length 
             htmlDocument = htmlDocument.slice(0, i) + 
-            '<script src="/ws.test.js"></script>' +
+            '<script src="/ws.js"></script>' +
             htmlDocument.slice(i); 
             break;
         }
@@ -238,29 +251,8 @@ async function parseHTML(htmlDocument) {
     return htmlDocument
 }
 
-// Fetch a document from server
-async function fetchDocument (url) {
-    if (/https?:\/\/.*\..*/gi.test(url)) {
-        const req = new Request(CROS_SERVER_ENDPOINT, {
-            method: 'GET',
-            headers: {
-                'P-DOCUMENT-GET': url
-            }
-        }); 
-        const res = await fetch(req); 
-        if (res.ok) {
-            return await res.text()
-        }else{
-            throw 'Request Failed.'
-        }
-    }else{
-        throw 'URL must start with either http or https. Domain name or postfix is missing can also cause this error.'
-    }
-    
-} 
-
 // loads the old request data to a new one
-async function newReq(request) { // ,url
+async function newReqInit(request) {
     const body = await request.blob();
      
     return {
@@ -269,30 +261,11 @@ async function newReq(request) { // ,url
         body: body.size > 0 ? body : null, 
         mode: request.mode == 'navigate' ? 'cors' : request.mode, 
         credentials: request.credentials,
-        // cache: '', 
         redirect: request.redirect,
 
     }
-
-    // return new Request(url ? url : request.url, {
-    //     method: request.method, // probably the most important thing, don't want to have GET sent when we POST
-    //     body: body.length > 0 ? body : null,
-    //     // mode: request.mode == 'navigate' ?  : request.mode,
-    //     headers: request.headers,
-    //     mode: request.mode == 'navigate' ? 'cors' : request.mode,
-    //     credentials: request.credentials,
-    //     redirect: request.redirect
-    // });
-
-
 }
 
-const localResource = [ // local resource that the client can access
-    'ws.test.js',
-    'index.test.js',
-    'test.html',
-    'sw.test.js'
-]
 // request handler
 async function handler(request) {
     // console.log(request.url)
@@ -313,16 +286,9 @@ async function handler(request) {
     console.log(request.url);
     const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
     
-    let response
-    if (url.match(/https?:\/\//g).length > 2) {
-        // response = await fetch(await newReq(
-        //     request,
-        //     request.url
-        // ));
-        response = await fetch(request.url, await newReq(request));
-    }else {
-        response = await fetch(CROS_SERVER_ENDPOINT + url, await newReq(request));
-    }
+    let response = url.match(/https?:\/\//g).length > 2 
+    ? await fetch(request.url, await newReqInit(request)) 
+    : await fetch(CROS_SERVER_ENDPOINT + url, await newReqInit(request));
     // console.log(response.headers.forEach(function (value, key) {
     //     console.log(key + ': ' + value)
     // }));
@@ -337,9 +303,3 @@ async function handler(request) {
         return response;
     }
 }
-
-self.addEventListener('fetch',function (event) {
-    // console.log(event.request.method + ' ' + event.request.url);
-    // console.log(JSON.stringify(event.request))
-    event.respondWith(handler(event.request))    
-});
