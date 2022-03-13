@@ -429,8 +429,8 @@ function upgradeListener(req, clientSocket, head) {
     // Create the server
     const proxy = ENGINE == 'NATIVE' ? 
         https.createServer({
-            key: fs.readFileSync( DIR_PATH + 'test/key.pem' ),
-            cert: fs.readFileSync(DIR_PATH + 'test/cert.pem'),
+            key: fs.readFileSync( DIR_PATH + 'etc/key.pem' ),
+            cert: fs.readFileSync(DIR_PATH + 'etc/cert.pem'),
         }) 
         : http.createServer() // we use http on on non Natvie engines because it's already https by default
         

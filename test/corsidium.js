@@ -5,7 +5,7 @@
     DONE support basic redirect & removeal of CORS headers, 
     DONE web socket connections?!, 
 
-    new tab redirects,
+    DONE new tab redirects, (there're definely a few bugs, but idk where they are)
     cookies,
     local storage,
     session storage, 
@@ -390,10 +390,12 @@ function upgradeListener(req, clientSocket, head) {
                 proxySocket.on('data', (data) => {console.log( 'Target Incoming: ', data.toString())});
                 clientSocket.on('data', (data) => {console.log( 'client Incoming: ', data.toString())});
                 if (SSL_KEY_LOG_FILE) {proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));}
+
+                proxySocket.on('error', (error) => {console.log('Proxy Socket Error: ' + error)});
+                clientSocket.on('error', (error) => {console.log('Client Socket Error: ' + error)});
                 proxySocket.on('close', () => {
                     clientSocket.destroy();
                 });
-                // proxySocket.on('')
                 clientSocket.on('close', () => {
                     proxySocket.destroy();
                 });
@@ -429,8 +431,8 @@ function upgradeListener(req, clientSocket, head) {
     // Create the server
     const proxy = ENGINE == 'NATIVE' ? 
         https.createServer({
-            key: fs.readFileSync( DIR_PATH + 'test/key.pem' ),
-            cert: fs.readFileSync(DIR_PATH + 'test/cert.pem'),
+            key: fs.readFileSync( DIR_PATH + 'etc/key.pem' ),
+            cert: fs.readFileSync(DIR_PATH + 'etc/cert.pem'),
         }) 
         : http.createServer() // we use http on on non Natvie engines because it's already https by default
         
