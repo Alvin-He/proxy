@@ -222,8 +222,8 @@ async function prefetchDocument(url) {
         console.log('not redirected'); 
         CURRENT_URL = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
     }
-    if (!CURRENT_URL[CURRENT_URL.length - 1] == '/') {
-        CURRENT_URL = CURRENT_URL + '/';
+    if (CURRENT_URL[CURRENT_URL.length - 1] != '/') {
+        CURRENT_URL += '/';
     }
 }
 
