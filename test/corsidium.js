@@ -7,8 +7,8 @@
 
     DONE new tab redirects, (there're definely a few bugs, but idk where they are)
     cookies,
-    local storage,
-    session storage, 
+    local storage, // don't know if we can do muti local storage, we're gonna hit the quota instantly  
+    NOMOD session storage, // doesn't look like we need to do anything with this, the browser handle it pretty well 
     session dataBase(IndexedDB)??,
     web SQL??,
     cache storage???

@@ -222,7 +222,7 @@ async function prefetchDocument(url) {
         console.log('not redirected'); 
         CURRENT_URL = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
     }
-    if (!/\/$/.test(CURRENT_URL)) {
+    if (!CURRENT_URL[CURRENT_URL.length - 1] == '/') {
         CURRENT_URL = CURRENT_URL + '/';
     }
 }
@@ -412,6 +412,15 @@ async function handler(request) {
     // }));
     const contentType = response.headers.get('content-type');
     if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
+    // if (request.mode == 'navigate') {
+        // let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
+        // try{
+        //     let url = new URL(pureURL);
+        //     CURRENT_URL = url.origin + '/';
+        // }catch(e){
+        //     console.log(e)
+        // }
+
         return new Response(await parseHTML(await response.text()), {
             status: response.status,
             statusText: response.statusText,
