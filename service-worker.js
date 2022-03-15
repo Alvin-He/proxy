@@ -385,6 +385,11 @@ async function newReqInit(request) {
 }
 
 // request handler
+/**
+ * 
+ * @param {Request} request 
+ * @returns 
+ */
 async function handler(request) {
     // console.log(request.url)
     // if the server's endpoint is detected in the url
@@ -398,6 +403,24 @@ async function handler(request) {
         }
         // we might be handling a redirect passed from the server, so just pass it to the browser to handle it
         if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
+            if (request.destination == 'document' && request.mode == 'navigate') {
+
+                const response = await fetch(request);
+
+                let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
+                try {
+                    let url = new URL(pureURL);
+                    CURRENT_URL = url.origin + '/';
+                } catch (e) {
+                    console.log(e)
+                }
+
+                return new Response(await parseHTML(await response.text()), {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: new Headers(response.headers),
+                })
+            }
             return await fetch(request)
         }
     }; // tried to use else here but it somehow messed up the return values and caused 'undefined' behaviour
@@ -412,15 +435,6 @@ async function handler(request) {
     // }));
     const contentType = response.headers.get('content-type');
     if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
-    // if (request.mode == 'navigate') {
-        // let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
-        // try{
-        //     let url = new URL(pureURL);
-        //     CURRENT_URL = url.origin + '/';
-        // }catch(e){
-        //     console.log(e)
-        // }
-
         return new Response(await parseHTML(await response.text()), {
             status: response.status,
             statusText: response.statusText,
