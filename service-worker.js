@@ -9,7 +9,7 @@ let webSockets = {
 
 const injects = {
     ws: '<script src="/ws.js"></script>',
-    redirEndPoint: 'https://127.0.0.1:3000/',
+    redirEndPoint: CROS_SERVER_ENDPOINT,
 }
 
 const localResource = [ // local resource that the client can access
@@ -25,13 +25,13 @@ RegExp.escape = function (str) {
 };
 
 const REGEXP_CROS_SERVER_ENDPOINT = new RegExp(RegExp.escape(CROS_SERVER_ENDPOINT));
+// Utilities END
 
+// Listeners
 self.addEventListener('install', function (event) {
     console.log('Service worker installed.');
     self.skipWaiting();
 });
-
-let isLoopActive = false;
 
 self.addEventListener("message", async function (event){
     if (event.data){
@@ -47,7 +47,8 @@ self.addEventListener("message", async function (event){
                 // set the target url pointing to our endpoint and send the websocket
                 const targetUrl = (CROS_SERVER_ENDPOINT + 'LCPP/' + identifier).replace(/https?:\/\//, 'wss://');
                 if (await notifyServer(identifier, event.data.url)) {
-                    const socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols);
+                    let socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols);
+                    socket.isLoopActive = false; 
                     // listeners
                     socket.addEventListener('open', () => {
                         client.postMessage({
@@ -118,9 +119,9 @@ self.addEventListener("message", async function (event){
             const socket = webSockets[event.data.id]
             socket.send(event.data.data);
             // rapidly update the client about the websocket's buffer amount until we hit 0
-            if (!isLoopActive) { // one instance of loop at any given time
+            if (!socket.isLoopActive) { // one instance of loop at any given time
                 const loop = setInterval(() => {
-                    isLoopActive = true;
+                    socket.isLoopActive = true;
                     if (socket.bufferedAmount > 0 && socket.readyState == 1) {
                         client.postMessage({
                             type: 'WEB_SOCKET_UPDATE',
@@ -132,7 +133,7 @@ self.addEventListener("message", async function (event){
                             type: 'WEB_SOCKET_UPDATE',
                             data: 0,
                         });
-                        isLoopActive = false;
+                        socket.isLoopActive = false;
                     }
                 }, 100);
             }
@@ -172,7 +173,7 @@ self.addEventListener("message", async function (event){
 self.addEventListener('fetch', function (event) {
     // console.log(event.request.method + ' ' + event.request.url);
     // console.log(JSON.stringify(event.request))
-    event.respondWith(handler(event.request));
+    event.respondWith(requestHandler(event.request));
 });
 
 // generates an identifier in the form of LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
@@ -213,18 +214,7 @@ async function notifyServer(identifier, target) {
 // prefetch the document
 async function prefetchDocument(url) {
     const res = await fetch(CROS_SERVER_ENDPOINT + url);
-
-    console.log(res)
-    if (res.redirected) {
-        console.log('redirected')
-        CURRENT_URL = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
-    }else {
-        console.log('not redirected'); 
-        CURRENT_URL = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
-    }
-    if (CURRENT_URL[CURRENT_URL.length - 1] != '/') {
-        CURRENT_URL += '/';
-    }
+    CURRENT_URL = (new URL(res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, ''))).origin + '/';
 }
 
 /**
@@ -390,7 +380,7 @@ async function newReqInit(request) {
  * @param {Request} request 
  * @returns 
  */
-async function handler(request) {
+async function requestHandler(request) {
     // console.log(request.url)
     // if the server's endpoint is detected in the url
     if (REGEXP_CROS_SERVER_ENDPOINT.test(request.url)){
