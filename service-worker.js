@@ -214,7 +214,11 @@ async function notifyServer(identifier, target) {
 // prefetch the document
 async function prefetchDocument(url) {
     const res = await fetch(CROS_SERVER_ENDPOINT + url);
-    CURRENT_URL = new URL(res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')).origin + '/';
+    try {
+        CURRENT_URL = new URL(res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')).origin + '/';
+    }catch(e) {
+        console.log('C_URL_ERR')
+    }
 }
 
 /**
@@ -402,7 +406,7 @@ async function requestHandler(request) {
                     let url = new URL(pureURL);
                     CURRENT_URL = url.origin + '/';
                 } catch (e) {
-                    console.log(e)
+                    console.log(C_URL_ERR)
                 }
 
                 return new Response(await parseHTML(await response.text()), {
