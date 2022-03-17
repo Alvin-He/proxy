@@ -214,7 +214,7 @@ async function notifyServer(identifier, target) {
 // prefetch the document
 async function prefetchDocument(url) {
     const res = await fetch(CROS_SERVER_ENDPOINT + url);
-    CURRENT_URL = (new URL(res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, ''))).origin + '/';
+    CURRENT_URL = new URL(res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')).origin + '/';
 }
 
 /**
