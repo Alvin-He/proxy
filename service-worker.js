@@ -406,7 +406,7 @@ async function requestHandler(request) {
                     let url = new URL(pureURL);
                     CURRENT_URL = url.origin + '/';
                 } catch (e) {
-                    console.log(C_URL_ERR)
+                    console.log('C_URL_ERR')
                 }
 
                 return new Response(await parseHTML(await response.text()), {
