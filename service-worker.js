@@ -228,7 +228,7 @@ async function prefetchDocument(url) {
     try {
         CURRENT_URL = new URL(url).origin + '/';
     }catch(e) {
-        console.log('C_URL_ERR')
+        console.log('C_URL_ERR', url)
     }
 }
 
