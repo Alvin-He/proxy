@@ -197,7 +197,7 @@ async function notifyServer(identifier, target) {
         },
         body: JSON.stringify({
             identifier: identifier,
-            origin: CURRENT_URL,
+            origin: CURRENT_URL.origin,
             target: target
         })
     })
@@ -213,23 +213,24 @@ async function notifyServer(identifier, target) {
 
 // prefetch the document
 async function prefetchDocument(target) {
-    const res = await fetch(CROS_SERVER_ENDPOINT + target);
-    url = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
+    target = new URL(target);
+    const res = await fetch(CROS_SERVER_ENDPOINT + target.href);
+    let url = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
     if (res.redirected) {
         console.log('redirected')
         if (url.substring(0, 8).indexOf('://') == -1) {
             console.log('relatvie url')
             // TODO: handle redirects with relatvie urls
-            url = target + url              
+            url = target.origin + target.pathname + url              
         }
-    } else {
-        console.log('not redirected');
     }
-    try {
-        CURRENT_URL = new URL(url).origin + '/';
-    }catch(e) {
-        console.log('C_URL_ERR', url)
-    }
+    CURRENT_URL = new URL(url)
+
+    // try {
+    //     CURRENT_URL = new URL(url).origin + '/';
+    // }catch(e) {
+    //     console.log('C_URL_ERR', url)
+    // }
 }
 
 /**
@@ -414,8 +415,9 @@ async function requestHandler(request) {
 
                 let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
                 try {
-                    let url = new URL(pureURL);
-                    CURRENT_URL = url.origin + '/';
+                    CURRENT_URL = new URL(pureURL)
+                    // let url = new URL(pureURL);
+                    // CURRENT_URL = url.origin + '/';
                 } catch (e) {
                     console.log('C_URL_ERR')
                 }
@@ -430,7 +432,7 @@ async function requestHandler(request) {
         }
     }; // tried to use else here but it somehow messed up the return values and caused 'undefined' behaviour
     console.log(request.url);
-    const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL)
+    const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.href)
     
     let response = url.match(/https?:\/\//g).length > 2 
     ? await fetch(request.url, await newReqInit(request)) 
