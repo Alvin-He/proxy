@@ -432,7 +432,7 @@ async function requestHandler(request) {
         }
     }; // tried to use else here but it somehow messed up the return values and caused 'undefined' behaviour
     console.log(request.url);
-    const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.href)
+    const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin)
     
     let response = url.match(/https?:\/\//g).length > 2 
     ? await fetch(request.url, await newReqInit(request)) 
