@@ -212,15 +212,15 @@ async function notifyServer(identifier, target) {
 }
 
 // prefetch the document
-async function prefetchDocument(url) {
-    const res = await fetch(CROS_SERVER_ENDPOINT + url);
+async function prefetchDocument(target) {
+    const res = await fetch(CROS_SERVER_ENDPOINT + target);
     url = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
     if (res.redirected) {
         console.log('redirected')
         if (url.substring(0, 8).indexOf('://') == -1) {
             console.log('relatvie url')
             // TODO: handle redirects with relatvie urls
-            url = CURRENT_URL + url              
+            url = target + url              
         }
     } else {
         console.log('not redirected');
