@@ -214,8 +214,19 @@ async function notifyServer(identifier, target) {
 // prefetch the document
 async function prefetchDocument(url) {
     const res = await fetch(CROS_SERVER_ENDPOINT + url);
+    url = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
+    if (res.redirected) {
+        console.log('redirected')
+        if (/https?:\/\//) {
+            console.log('relatvie url')
+            // TODO: handle redirects with relatvie urls
+        }
+    } else {
+        console.log('not redirected');
+        url = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
+    }
     try {
-        CURRENT_URL = new URL(res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')).origin + '/';
+        CURRENT_URL = new URL(url).origin + '/';
     }catch(e) {
         console.log('C_URL_ERR')
     }
