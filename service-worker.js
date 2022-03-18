@@ -217,7 +217,7 @@ async function prefetchDocument(url) {
     url = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
     if (res.redirected) {
         console.log('redirected')
-        if (/https?:\/\//) {
+        if (url.substring(0, 8).indexOf('://') == -1) {
             console.log('relatvie url')
             // TODO: handle redirects with relatvie urls
         }
