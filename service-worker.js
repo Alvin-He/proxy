@@ -220,10 +220,10 @@ async function prefetchDocument(url) {
         if (url.substring(0, 8).indexOf('://') == -1) {
             console.log('relatvie url')
             // TODO: handle redirects with relatvie urls
+            url = CURRENT_URL + url              
         }
     } else {
         console.log('not redirected');
-        url = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
     }
     try {
         CURRENT_URL = new URL(url).origin + '/';
