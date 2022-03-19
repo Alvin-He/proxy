@@ -421,7 +421,9 @@ async function requestHandler(request) {
                 } catch (e) {
                     console.log('C_URL_ERR')
                 }
-
+                if (response.status == 0) {
+                    return response
+                }
                 return new Response(await parseHTML(await response.text()), {
                     status: response.status,
                     statusText: response.statusText,

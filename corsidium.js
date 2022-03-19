@@ -209,7 +209,9 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
         }
     } else {
         proxyRes.headers['x-frame-options'] = 'SAMEORIGIN';
-
+        if (proxyRes.headers['content-security-policy']){
+            delete proxyRes.headers['content-security-policy'];
+        }
         proxyRes.headers = withCORS(proxyRes.headers, clientReq); 
     }
     clientRes.writeHead(statusCode, proxyRes.headers);
