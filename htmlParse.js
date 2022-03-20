@@ -25,6 +25,7 @@ async function parseHTML(htmlDocument) {
     }// fill the buffer
 
     let currentIndex = 6;
+    // HEAD parsing 
     for (let i = 0; i < length; i++) {
         if (buffer.join('').indexOf('<head') > -1) { // check if we found the header we wanted
             // insert web socket script
@@ -95,6 +96,8 @@ async function parseHTML(htmlDocument) {
         buffer.shift(); // remove the previous char
         buffer[bufferLength] = htmlDocument[i]; // insert the new char
     } // move the pointer to the end of index
+
+    // BODY parsing
     for (let i = currentIndex; i < length; i++) {
         if (buffer[4] + buffer[5] == '<a') { // found the start of the anchor tag
             // when we found the base, start looking for the href tag
@@ -123,7 +126,7 @@ async function parseHTML(htmlDocument) {
                                         htmlDocument = htmlDocument.slice(0, i) + injects.redirEndPoint + htmlDocument.slice(i);
                                         i += 6 + injects.redirEndPoint.length;
                                         length += injects.redirEndPoint.length;
-                                    } else if (val[0] + val[1] == '//') { // relative protocol url handling 
+                                    } else if (val[0] + val[1] == '//') { // relative url handling 
                                         const injectionURL = injects.redirEndPoint + 'https:'; // add the protocol (service workers are always over https, so it's https)
                                         htmlDocument = htmlDocument.slice(0, i) + injectionURL + htmlDocument.slice(i);
                                         i += injectionURL.length + 6;
