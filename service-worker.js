@@ -3,9 +3,21 @@ let CURRENT_URL = "";
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
 
 let currentID = 0;
+// Information about websockets, NOTE: this contains every single websocket that the service worker controls
 let webSockets = {
     0: null, // 0 is the default websocket(null);
 };
+
+// requests are handled specific to a frame(html page) so we can have muti tab support and iframes
+let frames = {
+    client: {
+        CURRENT_URL: '', // the current url(origin/domain) of the client
+        cookies: {}, // to be used in the future
+        localStorage: {}, // to be used in the future
+        sessionStorage: {}, // to be used in the future
+
+    }
+}
 
 const injects = {
     ws: '<script src="/ws.js"></script>',
@@ -147,6 +159,9 @@ self.addEventListener("message", async function (event){
                 // fetch and parse 
                 // response = await parseHTML(await fetchDocument(url), url);
                 await prefetchDocument(url);
+                // frames[client.id] = {
+                //     CURRENT_URL: url,
+                // }
                 status = 'ok';
             } catch (error) {
                 // response = error
@@ -173,7 +188,12 @@ self.addEventListener("message", async function (event){
 self.addEventListener('fetch', function (event) {
     // console.log(event.request.method + ' ' + event.request.url);
     // console.log(JSON.stringify(event.request))
-    event.respondWith(requestHandler(event.request));
+    if (event.resultingClientId && event.clientId == '') {
+        frames[event.resultingClientId] = {
+            CURRENT_URL: CURRENT_URL,
+        }
+    }
+    event.respondWith(requestHandler(event.request, event.clientId));
 });
 
 // generates an identifier in the form of LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
@@ -396,7 +416,8 @@ async function newReqInit(request) {
  * @param {Request} request 
  * @returns 
  */
-async function requestHandler(request) {
+async function requestHandler(request, clientID) {
+    console.log(clientID, frames[clientID] ? frames[clientID] : 'frame with id: ' + clientID + ' not found');
     // console.log(request.url)
     // if the server's endpoint is detected in the url
     if (REGEXP_CROS_SERVER_ENDPOINT.test(request.url)){
