@@ -144,6 +144,55 @@ async function parseHTML(htmlDocument) {
                 buffer.shift(); // remove the previous char
                 buffer[bufferLength] = htmlDocument[i]; // insert the new char
             }
+        }else if (buffer.join('') == '<ifram') { // found the start of the iframe tag (not really, but it's close enough)
+            // buffer reload
+            i += 2; // skip the missing 'e' and space char
+            
+            for (const e = i + 3; i <= e; i++) { // shift 3 times, so that we don't do unnecessary checks
+                buffer.shift();
+                buffer[bufferLength] = htmlDocument[i];
+            }
+            for (; i < length; i++) {
+                // check this, coppolit made it and I'm sure it put some bugs in there
+                if (buffer.join('').indexOf('src') > -1) { // found src
+                    // currentIndex = i;
+                    // when we found the src, start looking for the equal sign
+                    for (; i < length; i++) {
+                        if (htmlDocument[i] == '=') {
+                            // currentIndex += i;
+                            // when we found the equal sign, start looking for the quote
+                            for (; i < length; i++) {
+                                if (htmlDocument[i] == '"') {
+                                    i++;
+                                    // when we found the quote, start checking if we have an absolute url
+                                    for (let I = 0; I < 6; I++) {
+                                        buffer[I] = htmlDocument[i + I];
+                                    }// reload the buffer as it's now outdated
+                                    const val = buffer.join('');
+                                    if (val == 'https:' || val == 'http:/') { // found absolute url
+                                        // redirect the url
+                                        htmlDocument = htmlDocument.slice(0, i) + injects.redirEndPoint + htmlDocument.slice(i);
+                                        i += 6 + injects.redirEndPoint.length;
+                                        length += injects.redirEndPoint.length;
+                                    } else if (val[0] + val[1] == '//') { // relative url handling 
+                                        const injectionURL = injects.redirEndPoint + 'https:'; // add the protocol (service workers are always over https, so it's https)
+                                        htmlDocument = htmlDocument.slice(0, i) + injectionURL + htmlDocument.slice(i);
+                                        i += injectionURL.length + 6;
+                                        length += injectionURL.length;
+                                    }// if it's an relative url, we don't need to do anything
+                                    currentIndex = i;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+                buffer.shift(); // remove the previous char
+                buffer[bufferLength] = htmlDocument[i]; // insert the new char
+            }
+            break;
         }
         buffer.shift(); // remove the previous char
         buffer[bufferLength] = htmlDocument[i]; // insert the new char
