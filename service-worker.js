@@ -271,6 +271,7 @@ async function parseHTML(htmlDocument) {
     }// fill the buffer
 
     let currentIndex = 6;
+    // HEAD parsing 
     for (let i = 0; i < length; i++) {
         if (buffer.join('').indexOf('<head>') > -1) { // check if we found the header we wanted
             // insert web socket script
@@ -341,6 +342,8 @@ async function parseHTML(htmlDocument) {
         buffer.shift(); // remove the previous char
         buffer[bufferLength] = htmlDocument[i]; // insert the new char
     } // move the pointer to the end of index
+
+    // BODY parsing
     for (let i = currentIndex; i < length; i++) {
         if (buffer[4] + buffer[5] == '<a') { // found the start of the anchor tag
             // when we found the base, start looking for the href tag
@@ -369,7 +372,7 @@ async function parseHTML(htmlDocument) {
                                         htmlDocument = htmlDocument.slice(0, i) + injects.redirEndPoint + htmlDocument.slice(i);
                                         i += 6 + injects.redirEndPoint.length;
                                         length += injects.redirEndPoint.length;
-                                    } else if (val[0] + val[1] == '//') { // relative protocol url handling 
+                                    } else if (val[0] + val[1] == '//') { // relative url handling 
                                         const injectionURL = injects.redirEndPoint + 'https:'; // add the protocol (service workers are always over https, so it's https)
                                         htmlDocument = htmlDocument.slice(0, i) + injectionURL + htmlDocument.slice(i);
                                         i += injectionURL.length + 6;
@@ -383,7 +386,55 @@ async function parseHTML(htmlDocument) {
                         }
                     }
                     break;
-                }
+                } else if (buffer.join().indexOf('</a>') > -1) break; // EOT check
+                buffer.shift(); // remove the previous char
+                buffer[bufferLength] = htmlDocument[i]; // insert the new char
+            }
+        } else if (buffer.join('') == '<ifram') { // found the start of the iframe tag (not really, but it's close enough)
+            // buffer reload
+            i += 2; // skip the missing 'e' and space char
+
+            for (const e = i + 3; i <= e; i++) { // shift 3 times, so that we don't do unnecessary checks
+                buffer.shift();
+                buffer[bufferLength] = htmlDocument[i];
+            }
+            for (; i < length; i++) {
+                // check this, coppolit made it and I'm sure it put some bugs in there
+                if (buffer.join('').indexOf('src') > -1) { // found src
+                    // currentIndex = i;
+                    // when we found the src, start looking for the equal sign
+                    for (; i < length; i++) {
+                        if (htmlDocument[i] == '=') {
+                            // currentIndex += i;
+                            // when we found the equal sign, start looking for the quote
+                            for (; i < length; i++) {
+                                if (htmlDocument[i] == '"') {
+                                    i++;
+                                    // when we found the quote, start checking if we have an absolute url
+                                    for (let I = 0; I < 6; I++) {
+                                        buffer[I] = htmlDocument[i + I];
+                                    }// reload the buffer as it's now outdated
+                                    const val = buffer.join('');
+                                    if (val == 'https:' || val == 'http:/') { // found absolute url
+                                        // redirect the url
+                                        htmlDocument = htmlDocument.slice(0, i) + injects.redirEndPoint + htmlDocument.slice(i);
+                                        i += 6 + injects.redirEndPoint.length;
+                                        length += injects.redirEndPoint.length;
+                                    } else if (val[0] + val[1] == '//') { // relative url handling 
+                                        const injectionURL = injects.redirEndPoint + 'https:'; // add the protocol (service workers are always over https, so it's https)
+                                        htmlDocument = htmlDocument.slice(0, i) + injectionURL + htmlDocument.slice(i);
+                                        i += injectionURL.length + 6;
+                                        length += injectionURL.length;
+                                    }// if it's an relative url, we don't need to do anything
+                                    currentIndex = i;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                } else if (buffer.join('') == '</ifra') break; // EOT (end of tag) check
                 buffer.shift(); // remove the previous char
                 buffer[bufferLength] = htmlDocument[i]; // insert the new char
             }
