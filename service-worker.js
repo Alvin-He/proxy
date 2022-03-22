@@ -462,8 +462,29 @@ async function newReqInit(request) {
 }
 
 // response constructor
-async function fetchRespond(fetchDes, fetchInit = null) {
-    
+async function fetchRespond(fetchDes, fetchInit = undefined) {
+    const response = await fetch(fetchDes, fetchInit); 
+
+    if (request.mode == 'navigate' && request.destination == 'document') {
+        let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
+        try {
+            CURRENT_URL = new URL(pureURL)
+            // let url = new URL(pureURL);
+            // CURRENT_URL = url.origin + '/';
+        } catch (e) {
+            console.log('C_URL_ERR')
+        }
+    }
+    if (response.status == 0) return response;
+    const contentType = response.headers.get('content-type');
+    if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
+        return new Response(await parseHTML(await response.text()), {
+            status: response.status,
+            statusText: response.statusText,
+            headers: new Headers(response.headers),
+        });
+    }
+    return response;
 }
 
 // request handler
@@ -477,56 +498,27 @@ async function requestHandler(request, clientID) {
     // console.log(request.url)
     // if the server's endpoint is detected in the url
     if (REGEXP_CROS_SERVER_ENDPOINT.test(request.url)){
-        // if we are asking for a local resource 
         let reqUrl = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
+        // if we are loading a signal url
+        if (reqUrl.startsWith('sw-signal')) {
+            //TODO
+        } 
+        // if we are asking for a local resource 
         for (const path of localResource) {
             if (path == reqUrl) {
-                return await fetch(request)
+                return await fetch(request);
             }
         }
         // we might be handling a redirect passed from the server, so just pass it to the browser to handle it
         if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
-            if (request.mode == 'navigate' && request.destination == 'document') {
-
-                const response = await fetch(request);
-
-                let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
-                try {
-                    CURRENT_URL = new URL(pureURL)
-                    // let url = new URL(pureURL);
-                    // CURRENT_URL = url.origin + '/';
-                } catch (e) {
-                    console.log('C_URL_ERR')
-                }
-                if (response.status == 0) {
-                    return response
-                }
-                return new Response(await parseHTML(await response.text()), {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: new Headers(response.headers),
-                })
-            }
-            return await fetch(request)
+            return await fetchRespond(request)
         }
     }; // tried to use else here but it somehow messed up the return values and caused 'undefined' behaviour
     // console.log(request.url);
     const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
     
-    let response = url.match(/https?:\/\//g).length > 2 
-    ? await fetch(request.url, await newReqInit(request)) 
-    : await fetch(CROS_SERVER_ENDPOINT + url, await newReqInit(request));
-    // console.log(response.headers.forEach(function (value, key) {
-    //     console.log(key + ': ' + value)
-    // }));
-    const contentType = response.headers.get('content-type');
-    if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
-        return new Response(await parseHTML(await response.text()), {
-            status: response.status,
-            statusText: response.statusText,
-            headers: new Headers(response.headers),
-        })
-    }else{
-        return response;
-    }
+    return url.match(/https?:\/\//g).length > 2 
+    ? await fetchRespond(request.url, await newReqInit(request)) 
+    : await fetchRespond(CROS_SERVER_ENDPOINT + url, await newReqInit(request));
+    
 }

@@ -43,7 +43,7 @@ function doCORSRequest() {
             //     type: 'UPDATE_CURRENT_URL',
             //     url : url
             // })
-            window.location.href = 'https://' + window.location.host + '/sw-signal/top-level-navigate/' + url;
+            window.location.href = 'https://' + window.location.host /*+ '/sw-signal/top-level-navigate/'*/ + url;
             // let newWindow = window.open('https://127.0.0.1:3000')
             // newWindow.document.write(response)
             // newWindow.document.scripts.
