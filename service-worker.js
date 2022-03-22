@@ -193,7 +193,7 @@ self.addEventListener('fetch', function (event) {
             CURRENT_URL: CURRENT_URL,
         }
     }
-    event.respondWith(requestHandler(event.request, event.clientId));
+    event.respondWith(requestHandler(event.request, event.clientId || event.resultingClientId));
 });
 
 // generates an identifier in the form of LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
@@ -461,6 +461,11 @@ async function newReqInit(request) {
     }
 }
 
+// response constructor
+async function fetchRespond(fetchDes, fetchInit = null) {
+    
+}
+
 // request handler
 /**
  * 
@@ -481,7 +486,7 @@ async function requestHandler(request, clientID) {
         }
         // we might be handling a redirect passed from the server, so just pass it to the browser to handle it
         if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
-            if (request.destination == 'document' && request.mode == 'navigate') {
+            if (request.mode == 'navigate' && request.destination == 'document') {
 
                 const response = await fetch(request);
 
@@ -505,7 +510,7 @@ async function requestHandler(request, clientID) {
             return await fetch(request)
         }
     }; // tried to use else here but it somehow messed up the return values and caused 'undefined' behaviour
-    console.log(request.url);
+    // console.log(request.url);
     const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
     
     let response = url.match(/https?:\/\//g).length > 2 
