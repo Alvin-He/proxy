@@ -21,7 +21,7 @@ let frames = {
 
 const injects = {
     ws: '<script src="/ws.js"></script>',
-    redirEndPoint: CROS_SERVER_ENDPOINT,
+    redirEndPoint: CROS_SERVER_ENDPOINT // + 'sw-signal/top-level-navigate/',
 }
 
 const localResource = [ // local resource that the client can access
@@ -462,7 +462,7 @@ async function newReqInit(request) {
 }
 
 // response constructor
-async function fetchRespond(fetchDes, fetchInit = undefined) {
+async function fetchRespond(request, fetchDes, fetchInit = undefined) {
     const response = await fetch(fetchDes, fetchInit); 
 
     if (request.mode == 'navigate' && request.destination == 'document') {
@@ -497,11 +497,25 @@ async function requestHandler(request, clientID) {
     console.log(clientID, frames[clientID] ? frames[clientID] : 'frame with id: ' + clientID + ' not found');
     // console.log(request.url)
     // if the server's endpoint is detected in the url
+    let CURRENT_URL = frames[clientID] ? frames[clientID].CURRENT_URL : undefined;
     if (REGEXP_CROS_SERVER_ENDPOINT.test(request.url)){
         let reqUrl = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
         // if we are loading a signal url
         if (reqUrl.startsWith('sw-signal')) {
             //TODO
+            const signalType = reqUrl.split('/')[1];
+            if (signalType == 'top-level-navigate') {
+                const url = reqUrl.substring(29);
+                try {
+                    frames[clientID] = {
+                        CURRENT_URL: new URL(url),
+                    }
+                } catch (e) {
+                    console.log('C_URL_ERR')
+                }
+                return new Response(null, { 'status': 302, 'statusText': 'SW-TLN Ready', 'headers': { 'location': CROS_SERVER_ENDPOINT}});
+                // return fetchRespond(request, CROS_SERVER_ENDPOINT + url, await newReqInit(request));
+            }
         } 
         // if we are asking for a local resource 
         for (const path of localResource) {
@@ -511,14 +525,14 @@ async function requestHandler(request, clientID) {
         }
         // we might be handling a redirect passed from the server, so just pass it to the browser to handle it
         if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
-            return await fetchRespond(request)
+            return await fetchRespond(request, request)
         }
     }; // tried to use else here but it somehow messed up the return values and caused 'undefined' behaviour
     // console.log(request.url);
     const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
     
     return url.match(/https?:\/\//g).length > 2 
-    ? await fetchRespond(request.url, await newReqInit(request)) 
-    : await fetchRespond(CROS_SERVER_ENDPOINT + url, await newReqInit(request));
+    ? await fetchRespond(request, request.url, await newReqInit(request)) 
+    : await fetchRespond(request, CROS_SERVER_ENDPOINT + url, await newReqInit(request));
     
 }
