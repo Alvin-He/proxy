@@ -21,8 +21,8 @@ let frames = {
 
 const injects = {
     ws: '<script src="/ws.js"></script>',
-    redirEndPoint: CROS_SERVER_ENDPOINT, // + 'sw-signal/anchor-navigate',
-    iframeRedir: CROS_SERVER_ENDPOINT , // + 'sw-signal/top-level-navigate'
+    redirEndPoint: CROS_SERVER_ENDPOINT + 'sw-signal/top-level-navigate/', //'sw-signal/anchor-navigate/',
+    iframeRedir: CROS_SERVER_ENDPOINT  + 'sw-signal/top-level-navigate/'
 }
 
 const localResource = [ // local resource that the client can access
@@ -189,11 +189,11 @@ self.addEventListener("message", async function (event){
 self.addEventListener('fetch', function (event) {
     // console.log(event.request.method + ' ' + event.request.url);
     // console.log(JSON.stringify(event.request))
-    if (event.resultingClientId && event.clientId == '') {
-        frames[event.resultingClientId] = {
-            CURRENT_URL: CURRENT_URL,
-        }
-    }
+    // if (event.resultingClientId && event.clientId == '') {
+    //     frames[event.resultingClientId] = {
+    //         CURRENT_URL: CURRENT_URL,
+    //     }
+    // }
     event.respondWith(requestHandler(event.request, event.clientId || event.resultingClientId));
 });
 
@@ -245,7 +245,7 @@ async function prefetchDocument(target) {
             url = target.origin + target.pathname + url              
         }
     }
-    CURRENT_URL = new URL(url)
+    // CURRENT_URL = new URL(url)
 
     // try {
     //     CURRENT_URL = new URL(url).origin + '/';
@@ -463,19 +463,19 @@ async function newReqInit(request) {
 }
 
 // sw signal handler
-async function signalHandler(request) {
+async function signalHandler(request, reqUrl, clientID) {
     //TODO
     const signalType = reqUrl.split('/')[1];
     if (signalType == 'top-level-navigate') {
-        const url = reqUrl.substring(29);
+        let url = reqUrl.substring(29);
         try {
             frames[clientID] = {
-                CURRENT_URL: new URL(url),
+                CURRENT_URL: url = new URL(url),
             }
         } catch (e) {
             console.log('C_URL_ERR')
         }
-        return new Response(null, { 'status': 302, 'statusText': 'SW-TLN Ready', 'headers': { 'location': CROS_SERVER_ENDPOINT}});
+        return new Response(null, { 'status': 302, 'statusText': 'SW-TLN Ready', 'headers': { 'location': CROS_SERVER_ENDPOINT + url.pathname.substring(1)} });
         // return fetchRespond(request, CROS_SERVER_ENDPOINT + url, await newReqInit(request));
     }else if(signalType == 'anchor-navigate') {
         const url = reqUrl.substring(26);
@@ -486,7 +486,7 @@ async function signalHandler(request) {
         } catch (e) {
             console.log('C_URL_ERR')
         }
-        return await fetchRespond(request, request); 
+        return await fetchRespond(request, CROS_SERVER_ENDPOINT + url); 
     }else {
         return new Response(null, {'status': 400, 'statusText': 'Bad Request'});
     }
@@ -497,16 +497,16 @@ async function signalHandler(request) {
 async function fetchRespond(request, fetchDes, fetchInit = undefined) {
     const response = await fetch(fetchDes, fetchInit); 
 
-    if (request.mode == 'navigate' && request.destination == 'document') {
-        let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
-        try {
-            CURRENT_URL = new URL(pureURL)
-            // let url = new URL(pureURL);
-            // CURRENT_URL = url.origin + '/';
-        } catch (e) {
-            console.log('C_URL_ERR')
-        }
-    }
+    // if (request.mode == 'navigate' && request.destination == 'document') {
+    //     let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
+    //     try {
+    //         CURRENT_URL = new URL(pureURL)
+    //         // let url = new URL(pureURL);
+    //         // CURRENT_URL = url.origin + '/';
+    //     } catch (e) {
+    //         console.log('C_URL_ERR')
+    //     }
+    // }
     if (response.status == 0) return response;
     const contentType = response.headers.get('content-type');
     if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
@@ -534,7 +534,7 @@ async function requestHandler(request, clientID) {
         let reqUrl = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
         // if we are loading a signal url
         if (reqUrl.startsWith('sw-signal')) {
-            return await signalHandler(request);
+            return await signalHandler(request, reqUrl, clientID);
         } 
         // if we are asking for a local resource 
         for (const path of localResource) {
