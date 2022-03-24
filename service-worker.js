@@ -154,7 +154,7 @@ self.addEventListener("message", async function (event){
             webSockets[event.data.id].close(event.data.code, event.data.reason);
         }else if (event.data.type == 'FETCH_DOCUMENT'){
             // console.log(event.data.url)
-            const url = event.data.url
+            let url = event.data.url
             let response, status
             try {
                 // fetch and parse 
