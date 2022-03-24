@@ -159,7 +159,7 @@ self.addEventListener("message", async function (event){
             try {
                 // fetch and parse 
                 // response = await parseHTML(await fetchDocument(url), url);
-                await prefetchDocument(url);
+                url = await prefetchDocument(url);
                 // frames[client.id] = {
                 //     CURRENT_URL: url,
                 // }
@@ -245,6 +245,7 @@ async function prefetchDocument(target) {
             url = target.origin + target.pathname + url              
         }
     }
+    return url
     // CURRENT_URL = new URL(url)
 
     // try {

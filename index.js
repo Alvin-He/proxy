@@ -25,7 +25,7 @@ navigator.serviceWorker.addEventListener('message', (event) => {
             if (serviceWorkerFetchs[event.data.url] 
             && typeof serviceWorkerFetchs[event.data.url] == 'function') {
                 // serviceWorkerFetchs[event.data.url](event.data.response, event.data.status)
-                serviceWorkerFetchs[event.data.url](event.data.status)
+                serviceWorkerFetchs[event.data.url](event.data.status, event.data.url)
             }
         }
     }
@@ -34,8 +34,8 @@ navigator.serviceWorker.addEventListener('message', (event) => {
 function doCORSRequest() {
     let url = document.getElementById('Url').value; 
     //create callback          response, 
-    serviceWorkerFetchs[url] = (status) => {
-        console.log("GET" + ' ' + url + ' ' + status);
+    serviceWorkerFetchs[url] = (status, resultUrl) => {
+        console.log("GET" + ' ' + url + ' ' + status + ' result ' + resultUrl);
         // window.document.getElementsByTagName('html')[0].innerHTML = "";
         if (status == 'ok') {
             // updates the current url 
@@ -43,7 +43,7 @@ function doCORSRequest() {
             //     type: 'UPDATE_CURRENT_URL',
             //     url : url
             // })
-            window.location.href = 'https://' + window.location.host + '/sw-signal/top-level-navigate/' + url;
+            window.location.href = 'https://' + window.location.host + '/sw-signal/top-level-navigate/' + resultUrl;
             // let newWindow = window.open('https://127.0.0.1:3000')
             // newWindow.document.write(response)
             // newWindow.document.scripts.
