@@ -59,7 +59,7 @@ self.addEventListener("message", async function (event){
                 const identifier = await generateIdentifier(host, origin);
                 // set the target url pointing to our endpoint and send the websocket
                 const targetUrl = (CROS_SERVER_ENDPOINT + 'LCPP/' + identifier).replace(/https?:\/\//, 'wss://');
-                if (await notifyServer(identifier, event.data.url)) {
+                if (await notifyServer(identifier, frames[client.id].CURRENT_URL ,event.data.url)) {
                     let socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols);
                     socket.isLoopActive = false; 
                     // listeners
@@ -154,12 +154,12 @@ self.addEventListener("message", async function (event){
             webSockets[event.data.id].close(event.data.code, event.data.reason);
         }else if (event.data.type == 'FETCH_DOCUMENT'){
             // console.log(event.data.url)
-            let url = event.data.url
-            let response, status
+            const originUrl = event.data.url
+            let resultUrl, status
             try {
                 // fetch and parse 
                 // response = await parseHTML(await fetchDocument(url), url);
-                url = await prefetchDocument(url);
+                resultUrl = await prefetchDocument(originUrl);
                 // frames[client.id] = {
                 //     CURRENT_URL: url,
                 // }
@@ -170,7 +170,8 @@ self.addEventListener("message", async function (event){
             }
             event.source.postMessage({
                 type : event.data.type,  
-                url : url,
+                originUrl: originUrl,
+                resultUrl: resultUrl,
                 status : status,
                 // response : response
             })
@@ -210,7 +211,7 @@ async function generateIdentifier(host, origin) {
 }
 
 // ya, we're definely gonna switch to socket io afterwards .......
-async function notifyServer(identifier, target) {
+async function notifyServer(identifier, origin, target) {
     const req = new Request(CROS_SERVER_ENDPOINT + 'LCPP', {
         method: 'POST',
         headers: {
@@ -218,7 +219,7 @@ async function notifyServer(identifier, target) {
         },
         body: JSON.stringify({
             identifier: identifier,
-            origin: CURRENT_URL.origin,
+            origin: origin,
             target: target
         })
     })

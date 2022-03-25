@@ -22,10 +22,10 @@ navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data) {
         if (event.data.type == 'FETCH_DOCUMENT') {
             // loads callback for the according url
-            if (serviceWorkerFetchs[event.data.url] 
-            && typeof serviceWorkerFetchs[event.data.url] == 'function') {
+            if (serviceWorkerFetchs[event.data.originUrl] 
+                && typeof serviceWorkerFetchs[event.data.originUrl] == 'function') {
                 // serviceWorkerFetchs[event.data.url](event.data.response, event.data.status)
-                serviceWorkerFetchs[event.data.url](event.data.status, event.data.url)
+                serviceWorkerFetchs[event.data.originUrl](event.data.status, event.data.resultUrl)
             }
         }
     }
