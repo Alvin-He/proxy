@@ -33,6 +33,7 @@ const { URL } = require('url');
 const { createHash } = require('crypto');
 const localResource = [ // local resource that the client can access
     'ws.js',
+    'DOM.js',
     'index.js',
     'client.html', 
     'service-worker.js'

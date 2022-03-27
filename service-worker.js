@@ -21,12 +21,14 @@ let frames = {
 
 const injects = {
     ws: '<script src="/ws.js"></script>',
+    dom: '<script src="/DOM.js"></script>',
     redirEndPoint: CROS_SERVER_ENDPOINT + 'sw-signal/top-level-navigate/', //'sw-signal/anchor-navigate/',
     iframeRedir: CROS_SERVER_ENDPOINT  + 'sw-signal/top-level-navigate/'
 }
 
 const localResource = [ // local resource that the client can access
     'ws.js',
+    'DOM.js',
     'index.js',
     'client.html',
     'service-worker.js'
@@ -176,11 +178,9 @@ self.addEventListener("message", async function (event){
                 // response : response
             })
             
-        }else if (event.data.type == 'UPDATE_CURRENT_URL') {
-            if (/\/$/.test(event.data.url)) {
-                CURRENT_URL = event.data.url;
-            }else{
-                CURRENT_URL = event.data.url + '/';
+        }else if (event.data.type == 'NEW_NAVIGATION'){
+            frames[client.id] = {
+                CURRENT_URL: new URL(event.data.url),
             }
         };
     }
@@ -278,7 +278,7 @@ async function parseHTML(htmlDocument) {
     for (let i = 0; i < length; i++) {
         if (buffer.join('').indexOf('<head>') > -1) { // check if we found the header we wanted
             // insert web socket script
-            htmlDocument = htmlDocument.slice(0, i) + injects.ws + htmlDocument.slice(i);
+            htmlDocument = htmlDocument.slice(0, i) + injects.ws + injects.dom + htmlDocument.slice(i);
             currentIndex = i + injects.ws.length; // load the index for next round iteration
             length += injects.ws.length; // update the length of the document
             break;
@@ -286,6 +286,8 @@ async function parseHTML(htmlDocument) {
         buffer.shift(); // remove the previous char
         buffer[bufferLength] = htmlDocument[i]; // insert the new char
     } // websocket script inject 
+    return htmlDocument;
+
     for (let i = currentIndex; i < length; i++) {
         if (buffer.join('').indexOf('<base') > -1) { // found base
             // when we found the base, start looking for the href tag
@@ -496,7 +498,16 @@ async function signalHandler(request, reqUrl, clientID) {
 
 
 // response constructor
+/**
+ * 
+ * @param {Request} request 
+ * @param {Request | URL} fetchDes 
+ * @param {*} fetchInit 
+ * @returns 
+ */
 async function fetchRespond(request, fetchDes, fetchInit = undefined) {
+
+    
     const response = await fetch(fetchDes, fetchInit); 
 
     // if (request.mode == 'navigate' && request.destination == 'document') {
@@ -529,8 +540,9 @@ async function fetchRespond(request, fetchDes, fetchInit = undefined) {
  */
 async function requestHandler(request, clientID) {
     console.log(clientID, frames[clientID] ? frames[clientID] : 'frame with id: ' + clientID + ' not found');
-    // console.log(request.url)
-    // if the server's endpoint is detected in the url
+    if (request.mode == 'navigate') {
+        console.log(request.referrer)
+    }    // if the server's endpoint is detected in the url
     let CURRENT_URL = frames[clientID] ? frames[clientID].CURRENT_URL : undefined;
     if (REGEXP_CROS_SERVER_ENDPOINT.test(request.url)){
         let reqUrl = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
