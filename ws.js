@@ -181,4 +181,67 @@ class ws extends EventTarget {
     }
 }
 WebSocket = ws;
-console.log('WebSocket overwritten')
+console.log('WebSocket overwritten') 
+
+let __CORS_SCRIPT_LOADED = []; // a list of scripts that's loaded'
+
+const __CORS_browsePreset = '/browse/';
+const __CORS_user_location = () => { return new URL(location.pathname.substring(8)) }
+let _location = {
+    get search() { return location.search; },
+    set search(value) { location.search = value; },
+
+    get hash() { return location.hash; },
+    set hash(value) { location.hash = value; },
+
+    get host() { return __CORS_user_location().host; },
+    set host(value) {
+        __CORS_user_location().host = value;
+        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
+    },
+
+    get hostname() { return __CORS_user_location().hostname; },
+    set hostname(value) {
+        __CORS_user_location().hostname = value;
+        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
+    },
+
+    get origin() { return __CORS_user_location().origin; },
+    set origin(value) {
+        __CORS_user_location().origin = value;
+        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
+    },
+
+    get href() { return __CORS_user_location().href; },
+    set href(value) {
+        __CORS_user_location().href = value;
+        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
+    },
+
+    get pathname() { return __CORS_user_location().pathname; },
+    set pathname(value) {
+        __CORS_user_location().pathname = value;
+        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
+    },
+
+    get port() { return __CORS_user_location().port; },
+    set port(value) {
+        __CORS_user_location().port = value;
+        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
+    },
+
+    get protocol() { return __CORS_user_location().protocol; },
+    set protocol(value) {
+        __CORS_user_location().protocol = value;
+        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
+    },
+}
+let win = {
+    get location() { console.log('location acccess'); return _location; },
+    set location(value) { location.pathname = __CORS_browsePreset + new URL(value).href; },
+    __proto__: window,
+}
+win = window;
+const __CORS_location = win.location;
+globalThis = win;
+

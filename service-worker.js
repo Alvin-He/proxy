@@ -1,6 +1,16 @@
-const CROS_SERVER_ENDPOINT = serviceWorker.scriptURL.substring(0, serviceWorker.scriptURL.length - 'service-worker.js'.length); //'https://cros-proxy-testing.glitch.me/'
-let CURRENT_URL = "";
+/**
+ * Domain: https://127.0.0.1:3000/
+ * Local proxy resource access path: /local/<path>
+ * Browsing path: /browse/<external path to a web page>
+ * Serivce worker Signaling path: /sw-signal/<type>/<data>
+ * 
+ * The Browsing path is the path that the user navigates to.
+ * It should show the same url as the address bar if the user's browsing the url directly from the browser (no proxy)
+ * All redirects should refelect on the url
+ */
+const CROS_SERVER_ENDPOINT = new URL (serviceWorker.scriptURL.substring(0, serviceWorker.scriptURL.length - 'service-worker.js'.length)); //'https://cros-proxy-testing.glitch.me/'
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 let currentID = 0;
 // Information about websockets, NOTE: this contains every single websocket that the service worker controls
@@ -19,11 +29,13 @@ let frames = {
     }
 }
 
+const reg_exprTerm = /;|}|\s/;
+
 const injects = {
-    ws: '<script src="/ws.js"></script>',
-    dom: '<script src="/DOM.js"></script>',
-    redirEndPoint: CROS_SERVER_ENDPOINT + 'sw-signal/top-level-navigate/', //'sw-signal/anchor-navigate/',
-    iframeRedir: CROS_SERVER_ENDPOINT  + 'sw-signal/top-level-navigate/'
+    ws: '<script src="/local/ws.js"></script>',
+    dom: '<script src="/local/DOM.js"></script>',
+    redirEndPoint: CROS_SERVER_ENDPOINT.origin + '/sw-signal/navigate/', //'sw-signal/anchor-navigate/',
+    winLocation: '__CORS_location',
 }
 
 const localResource = [ // local resource that the client can access
@@ -39,7 +51,7 @@ RegExp.escape = function (str) {
     return str.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1");
 };
 
-const REGEXP_CROS_SERVER_ENDPOINT = new RegExp(RegExp.escape(CROS_SERVER_ENDPOINT));
+const REGEXP_CROS_SERVER_ENDPOINT = new RegExp(RegExp.escape(CROS_SERVER_ENDPOINT.origin + '/'));
 // Utilities END
 
 // Listeners
@@ -60,7 +72,7 @@ self.addEventListener("message", async function (event){
                 let {host, origin, href} = new URL(event.data.url);
                 const identifier = await generateIdentifier(host, origin);
                 // set the target url pointing to our endpoint and send the websocket
-                const targetUrl = (CROS_SERVER_ENDPOINT + 'LCPP/' + identifier).replace(/https?:\/\//, 'wss://');
+                const targetUrl = (CROS_SERVER_ENDPOINT.origin + '/LCPP/' + identifier).replace(/https?:\/\//, 'wss://');
                 if (await notifyServer(identifier, frames[client.id].CURRENT_URL ,event.data.url)) {
                     let socket = webSockets[id] = new WebSocket(targetUrl, event.data.protocols);
                     socket.isLoopActive = false; 
@@ -159,12 +171,7 @@ self.addEventListener("message", async function (event){
             const originUrl = event.data.url
             let resultUrl, status
             try {
-                // fetch and parse 
-                // response = await parseHTML(await fetchDocument(url), url);
                 resultUrl = await prefetchDocument(originUrl);
-                // frames[client.id] = {
-                //     CURRENT_URL: url,
-                // }
                 status = 'ok';
             } catch (error) {
                 // response = error
@@ -188,14 +195,7 @@ self.addEventListener("message", async function (event){
 })
 
 self.addEventListener('fetch', function (event) {
-    // console.log(event.request.method + ' ' + event.request.url);
-    // console.log(JSON.stringify(event.request))
-    // if (event.resultingClientId && event.clientId == '') {
-    //     frames[event.resultingClientId] = {
-    //         CURRENT_URL: CURRENT_URL,
-    //     }
-    // }
-    event.respondWith(requestHandler(event.request, event.clientId || event.resultingClientId));
+    event.respondWith(requestHandler(event, event.clientId || event.resultingClientId));
 });
 
 // generates an identifier in the form of LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
@@ -212,7 +212,7 @@ async function generateIdentifier(host, origin) {
 
 // ya, we're definely gonna switch to socket io afterwards .......
 async function notifyServer(identifier, origin, target) {
-    const req = new Request(CROS_SERVER_ENDPOINT + 'LCPP', {
+    const req = new Request(CROS_SERVER_ENDPOINT.origin + '/LCPP', {
         method: 'POST',
         headers: {
             'content-type': 'application/json'
@@ -236,24 +236,16 @@ async function notifyServer(identifier, origin, target) {
 // prefetch the document
 async function prefetchDocument(target) {
     target = new URL(target);
-    const res = await fetch(CROS_SERVER_ENDPOINT + target.href);
+    const res = await fetch(CROS_SERVER_ENDPOINT.origin + '/' + target.href);
     let url = res.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
     if (res.redirected) {
-        console.log('redirected')
+        console.log('prefetch redirected')
         if (url.substring(0, 8).indexOf('://') == -1) {
-            console.log('relatvie url')
             // TODO: handle redirects with relatvie urls
             url = target.origin + target.pathname + url              
         }
     }
     return url
-    // CURRENT_URL = new URL(url)
-
-    // try {
-    //     CURRENT_URL = new URL(url).origin + '/';
-    // }catch(e) {
-    //     console.log('C_URL_ERR', url)
-    // }
 }
 
 /**
@@ -266,193 +258,29 @@ async function prefetchDocument(target) {
  */
 async function parseHTML(htmlDocument) {
     if (htmlDocument.length < 1) return null; // if the document is empty, return null
-    let length = htmlDocument.length;
-    const buffer = new Array(6);
-    const bufferLength = buffer.length - 1;
-    for (let i = 0; i < 6; i++) {
-        buffer[i] = htmlDocument[i];
-    }// fill the buffer
-
-    let currentIndex = 6;
-    // HEAD parsing 
-    for (let i = 0; i < length; i++) {
-        if (buffer.join('').indexOf('<head>') > -1) { // check if we found the header we wanted
-            // insert web socket script
-            htmlDocument = htmlDocument.slice(0, i) + injects.ws + injects.dom + htmlDocument.slice(i);
-            currentIndex = i + injects.ws.length; // load the index for next round iteration
-            length += injects.ws.length; // update the length of the document
-            break;
-        }
-        buffer.shift(); // remove the previous char
-        buffer[bufferLength] = htmlDocument[i]; // insert the new char
-    } // websocket script inject 
+    htmlDocument = htmlDocument.replace('<head>', '<head>' + injects.dom + injects.ws);
+    htmlDocument = htmlDocument.replace(/integrity(?=\=(?="sha(256|384|512)-))/g, '__CROS_integrity')
     return htmlDocument;
-
-    for (let i = currentIndex; i < length; i++) {
-        if (buffer.join('').indexOf('<base') > -1) { // found base
-            // when we found the base, start looking for the href tag
-            for (const e = i + 4; i <= e; i++) { // shift 4 times, so that we don't do unnecessary checks
-                buffer.shift();
-                buffer[bufferLength] = htmlDocument[i];
-            }
-            for (; i < length; i++) {
-                if (buffer.join('').indexOf('href') > -1) { // found href
-                    // currentIndex = i;
-                    // when we found the href, start looking for the equal sign
-                    for (; i < length; i++) {
-                        if (htmlDocument[i] == '=') {
-                            // currentIndex += i;
-                            // when we found the equal sign, start looking for the quote
-                            for (; i < length; i++) {
-                                if (htmlDocument[i] == '"') {
-                                    i++;
-                                    // when we found the quote, start checking if we have an absolute url
-                                    for (let I = 0; I < 6; I++) {
-                                        buffer[I] = htmlDocument[i + I];
-                                    }// reload the buffer as it's now outdated
-                                    const val = buffer.join('');
-                                    if (val == 'https:' || val == 'http:/') { // found absolute url
-                                        // redirect the url
-                                        htmlDocument = htmlDocument.slice(0, i) + injects.redirEndPoint + htmlDocument.slice(i);
-                                        i += 6 + injects.redirEndPoint.length;
-                                        length += injects.redirEndPoint.length;
-                                    } else if (val[0] + val[1] == '//') { // relative protocol url handling 
-                                        const injectionURL = injects.redirEndPoint + 'https:'; // add the protocol (service workers are always over https, so it's https)
-                                        htmlDocument = htmlDocument.slice(0, i) + injectionURL + htmlDocument.slice(i);
-                                        i += injectionURL.length + 6;
-                                        length += injectionURL.length;
-                                    }// if it's an relative url, we don't need to do anything
-                                    currentIndex = i;
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                    break;
-                }
-                buffer.shift(); // remove the previous char
-                buffer[bufferLength] = htmlDocument[i]; // insert the new char
-            }
-            break;
-        }
-        buffer.shift(); // remove the previous char
-        buffer[bufferLength] = htmlDocument[i]; // insert the new char
-    } // base tag modification 
-    for (let i = currentIndex; i < length; i++) {
-        if (buffer.join('') == '/head>') { // found the end of the header
-            currentIndex = i;
-            break;
-        }
-        buffer.shift(); // remove the previous char
-        buffer[bufferLength] = htmlDocument[i]; // insert the new char
-    } // move the pointer to the end of index
-
-    // BODY parsing
-    for (let i = currentIndex; i < length; i++) {
-        if (buffer[4] + buffer[5] == '<a') { // found the start of the anchor tag
-            // when we found the base, start looking for the href tag
-            for (const e = i + 4; i <= e; i++) { // shift 4 times, so that we don't do unnecessary checks
-                buffer.shift();
-                buffer[bufferLength] = htmlDocument[i];
-            }
-            for (; i < length; i++) {
-                if (buffer.join('').indexOf('href') > -1) { // found href
-                    // currentIndex = i;
-                    // when we found the href, start looking for the equal sign
-                    for (; i < length; i++) {
-                        if (htmlDocument[i] == '=') {
-                            // currentIndex += i;
-                            // when we found the equal sign, start looking for the quote
-                            for (; i < length; i++) {
-                                if (htmlDocument[i] == '"') {
-                                    i++;
-                                    // when we found the quote, start checking if we have an absolute url
-                                    for (let I = 0; I < 6; I++) {
-                                        buffer[I] = htmlDocument[i + I];
-                                    }// reload the buffer as it's now outdated
-                                    const val = buffer.join('');
-                                    if (val == 'https:' || val == 'http:/') { // found absolute url
-                                        // redirect the url
-                                        htmlDocument = htmlDocument.slice(0, i) + injects.redirEndPoint + htmlDocument.slice(i);
-                                        i += 6 + injects.redirEndPoint.length;
-                                        length += injects.redirEndPoint.length;
-                                    } else if (val[0] + val[1] == '//') { // relative url handling 
-                                        const injectionURL = injects.redirEndPoint + 'https:'; // add the protocol (service workers are always over https, so it's https)
-                                        htmlDocument = htmlDocument.slice(0, i) + injectionURL + htmlDocument.slice(i);
-                                        i += injectionURL.length + 6;
-                                        length += injectionURL.length;
-                                    }// if it's an relative url, we don't need to do anything
-                                    currentIndex = i;
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                    break;
-                } else if (buffer.join().indexOf('</a>') > -1) break; // EOT check
-                buffer.shift(); // remove the previous char
-                buffer[bufferLength] = htmlDocument[i]; // insert the new char
-            }
-        } else if (buffer.join('') == '<ifram') { // found the start of the iframe tag (not really, but it's close enough)
-            // buffer reload
-            i += 2; // skip the missing 'e' and space char
-
-            for (const e = i + 3; i <= e; i++) { // shift 3 times, so that we don't do unnecessary checks
-                buffer.shift();
-                buffer[bufferLength] = htmlDocument[i];
-            }
-            for (; i < length; i++) {
-                // check this, coppolit made it and I'm sure it put some bugs in there
-                if (buffer.join('').indexOf('src') > -1) { // found src
-                    // currentIndex = i;
-                    // when we found the src, start looking for the equal sign
-                    for (; i < length; i++) {
-                        if (htmlDocument[i] == '=') {
-                            // currentIndex += i;
-                            // when we found the equal sign, start looking for the quote
-                            for (; i < length; i++) {
-                                if (htmlDocument[i] == '"') {
-                                    i++;
-                                    // when we found the quote, start checking if we have an absolute url
-                                    for (let I = 0; I < 6; I++) {
-                                        buffer[I] = htmlDocument[i + I];
-                                    }// reload the buffer as it's now outdated
-                                    const val = buffer.join('');
-                                    if (val == 'https:' || val == 'http:/') { // found absolute url
-                                        // redirect the url
-                                        htmlDocument = htmlDocument.slice(0, i) + injects.redirEndPoint + htmlDocument.slice(i);
-                                        i += 6 + injects.redirEndPoint.length;
-                                        length += injects.redirEndPoint.length;
-                                    } else if (val[0] + val[1] == '//') { // relative url handling 
-                                        const injectionURL = injects.redirEndPoint + 'https:'; // add the protocol (service workers are always over https, so it's https)
-                                        htmlDocument = htmlDocument.slice(0, i) + injectionURL + htmlDocument.slice(i);
-                                        i += injectionURL.length + 6;
-                                        length += injectionURL.length;
-                                    }// if it's an relative url, we don't need to do anything
-                                    currentIndex = i;
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                    break;
-                } else if (buffer.join('') == '</ifra') break; // EOT (end of tag) check
-                buffer.shift(); // remove the previous char
-                buffer[bufferLength] = htmlDocument[i]; // insert the new char
-            }
-        }
-        buffer.shift(); // remove the previous char
-        buffer[bufferLength] = htmlDocument[i]; // insert the new char
-    } // search for anchor tag (parsing the entire body)
-
-    return htmlDocument
 }
 
+// performance: ~130ms pre call :(
+/**
+ * 
+ * @param {String} code 
+ * @returns 
+ */
+async function parseJS(code, url) {
+    if (code.length < 1) return null;
+    code = 'try{__CORS_SCRIPT_LOADED.push(\''+ url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocation);
+    return code;
+}
+try {
+    
+} catch (error) {
+    
+}
 // loads the old request data to a new one
-async function newReqInit(request) {
+async function reqInit(request) {
     const body = await request.blob();
      
     return {
@@ -469,28 +297,17 @@ async function newReqInit(request) {
 // sw signal handler
 async function signalHandler(request, reqUrl, clientID) {
     //TODO
-    const signalType = reqUrl.split('/')[1];
-    if (signalType == 'top-level-navigate') {
-        let url = reqUrl.substring(29);
+    const signalType = reqUrl.split('/')[2];
+    if (signalType == 'navigate') { 
+        let url = reqUrl.substring(20);
         try {
-            frames[clientID] = {
-                CURRENT_URL: url = new URL(url),
-            }
+            if (frames[clientID]) frames[clientID].CURRENT_URL = new URL(url);
+            else frames[clientID] = { CURRENT_URL: url = new URL(url) };
         } catch (e) {
             console.log('C_URL_ERR')
         }
-        return new Response(null, { 'status': 302, 'statusText': 'SW-TLN Ready', 'headers': { 'location': CROS_SERVER_ENDPOINT + url.pathname.substring(1)} });
+        return new Response(null, { 'status': 302, 'statusText': 'SW-TLN Ready', 'headers': { 'location': CROS_SERVER_ENDPOINT.origin + '/' + url.pathname.substring(1)} });
         // return fetchRespond(request, CROS_SERVER_ENDPOINT + url, await newReqInit(request));
-    }else if(signalType == 'anchor-navigate') {
-        const url = reqUrl.substring(26);
-        try {
-            frames[clientID] = {
-                CURRENT_URL: new URL(url),
-            }
-        } catch (e) {
-            console.log('C_URL_ERR')
-        }
-        return await fetchRespond(request, CROS_SERVER_ENDPOINT + url); 
     }else {
         return new Response(null, {'status': 400, 'statusText': 'Bad Request'});
     }
@@ -506,28 +323,27 @@ async function signalHandler(request, reqUrl, clientID) {
  * @returns 
  */
 async function fetchRespond(request, fetchDes, fetchInit = undefined) {
-
     
+    // trying to use mandatory timeout to bypass integrity lol (and ofcourse it failed)
+    // const response = (await Promise.all([fetch(fetchDes, fetchInit), sleep(100)]))[0]; 
     const response = await fetch(fetchDes, fetchInit); 
 
-    // if (request.mode == 'navigate' && request.destination == 'document') {
-    //     let pureURL = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
-    //     try {
-    //         CURRENT_URL = new URL(pureURL)
-    //         // let url = new URL(pureURL);
-    //         // CURRENT_URL = url.origin + '/';
-    //     } catch (e) {
-    //         console.log('C_URL_ERR')
-    //     }
-    // }
     if (response.status == 0) return response;
     const contentType = response.headers.get('content-type');
-    if (contentType && typeof contentType == 'string' && contentType.includes('text/html')) {
-        return new Response(await parseHTML(await response.text()), {
-            status: response.status,
-            statusText: response.statusText,
-            headers: new Headers(response.headers),
-        });
+    if (contentType && typeof contentType == 'string') {
+        if (contentType.includes('/javascript')) {
+            return new Response(await parseJS(await response.text(), request.url), {
+                status: response.status,
+                statusText: response.statusText,
+                headers: new Headers(response.headers),
+            });
+        } else if (contentType.includes('text/html')) {
+            return new Response(await parseHTML(await response.text()), {
+                status: response.status,
+                statusText: response.statusText,
+                headers: new Headers(response.headers),
+            });
+        }
     }
     return response;
 }
@@ -538,34 +354,26 @@ async function fetchRespond(request, fetchDes, fetchInit = undefined) {
  * @param {Request} request 
  * @returns 
  */
-async function requestHandler(request, clientID) {
-    console.log(clientID, frames[clientID] ? frames[clientID] : 'frame with id: ' + clientID + ' not found');
-    if (request.mode == 'navigate') {
-        console.log(request.referrer)
-    }    // if the server's endpoint is detected in the url
-    let CURRENT_URL = frames[clientID] ? frames[clientID].CURRENT_URL : undefined;
-    if (REGEXP_CROS_SERVER_ENDPOINT.test(request.url)){
-        let reqUrl = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '')
-        // if we are loading a signal url
-        if (reqUrl.startsWith('sw-signal')) {
-            return await signalHandler(request, reqUrl, clientID);
-        } 
-        // if we are asking for a local resource 
-        for (const path of localResource) {
-            if (path == reqUrl) {
-                return await fetch(request);
-            }
-        }
-        // we might be handling a redirect passed from the server, so just pass it to the browser to handle it
-        if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
-            return await fetchRespond(request, request)
-        }
-    }; // tried to use else here but it somehow messed up the return values and caused 'undefined' behaviour
-    // console.log(request.url);
+async function requestHandler(event, clientID) {
+    // console.log(clientID, frames[clientID] ? frames[clientID] : 'frame with id: ' + clientID + ' not found');
+
+
+    const request = event.request;
+
+    let requestURL = new URL(request.url); 
+    let CURRENT_URL = frames[clientID] ? frames[clientID].CURRENT_URL : null;
+    if (requestURL.pathname.startsWith('/sw-signal/')) {
+        return signalHandler(request, requestURL.pathname, clientID);
+    }else if (requestURL.pathname.startsWith('/local/')) {
+        requestURL.pathname = requestURL.pathname.substring(7);
+        return await fetch(requestURL);
+    }else if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
+        return await fetchRespond(request, request)
+    }
+    
     const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
-    
-    return url.match(/https?:\/\//g).length > 2 
-    ? await fetchRespond(request, request.url, await newReqInit(request)) 
-    : await fetchRespond(request, CROS_SERVER_ENDPOINT + url, await newReqInit(request));
-    
+
+    return url.match(/https?:\/\//g).length > 2
+        ? await fetchRespond(request, request.url, await reqInit(request))
+        : await fetchRespond(request, CROS_SERVER_ENDPOINT + url, await reqInit(request));
 }

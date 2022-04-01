@@ -27,7 +27,7 @@ async function parseHTML(htmlDocument) {
 
     let currentIndex = 6;
     // HEAD parsing 
-    for (let i = 0; i < length; i++) {
+    for (let i = currentIndex; i < length; i++) {
         if (buffer.join('').indexOf('<head>') > -1) { // check if we found the header we wanted
             // insert web socket script
             htmlDocument = htmlDocument.slice(0, i) + injects.ws + htmlDocument.slice(i);

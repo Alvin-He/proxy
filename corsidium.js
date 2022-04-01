@@ -206,6 +206,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
         if (locationHeader && /^https?:\/\//.test(locationHeader)) {
             locationHeader = 'https://127.0.0.1:3000/' + locationHeader;
             console.log('Redirecting to: ' + locationHeader)
+            console.log(proxyReq.url.href)
             proxyRes.headers.location = locationHeader;
         }
     } else {

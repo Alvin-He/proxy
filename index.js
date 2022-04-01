@@ -1,6 +1,6 @@
 if ('serviceWorker' in navigator) {
     // window.addEventListener('load', function () {
-    navigator.serviceWorker.register('service-worker.js').then(function (registration) {
+    navigator.serviceWorker.register('/service-worker.js').then(function (registration) {
         // Registration was successful
         console.log('ServiceWorker registration successful with scope: ', registration.scope);
         return;
@@ -43,7 +43,7 @@ function doCORSRequest() {
             //     type: 'UPDATE_CURRENT_URL',
             //     url : url
             // })
-            window.location.href = 'https://' + window.location.host + '/sw-signal/top-level-navigate/' + resultUrl;
+            window.location.href = 'https://' + window.location.host + '/sw-signal/navigate/' + resultUrl;
             // let newWindow = window.open('https://127.0.0.1:3000')
             // newWindow.document.write(response)
             // newWindow.document.scripts.
