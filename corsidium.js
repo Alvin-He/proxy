@@ -77,6 +77,7 @@ function localServerResponse(path, clientRes) {
 }
 
 function isValidHostName(hostname) {
+    return true;
     return !!(
         hostname && // check if we have an empty hostname
         (regexp_tld.test(hostname) || // check for url extension
@@ -289,6 +290,10 @@ function requestListener(req, res) {
         try {
             targetURL = req.url.substring(1);
             // local resource loading, local resource overrides cookies
+            if (targetURL == '') {
+                localServerResponse('client.html', res); 
+                return true;
+            }
             for (const path of localResource) {
                 if (path == targetURL) {
                     localServerResponse(path, res);

@@ -18,6 +18,18 @@ let webSockets = {
     0: null, // 0 is the default websocket(null);
 };
 
+let log = [];
+let print = (...args) => {
+    args.forEach(arg => {
+        log.push(arg);
+    });
+}
+log.toString = () => {
+    log.forEach(arg => {
+        console.log(arg);
+    });
+}
+
 // requests are handled specific to a frame(html page) so we can have muti tab support and iframes
 let frames = {
     client: {
@@ -258,7 +270,7 @@ async function prefetchDocument(target) {
  */
 async function parseHTML(htmlDocument) {
     if (htmlDocument.length < 1) return null; // if the document is empty, return null
-    htmlDocument = htmlDocument.replace('<head>', '<head>' + injects.dom + injects.ws);
+    htmlDocument = htmlDocument.replace(/(?<=\<head.*\>)\s*(?=\<)/, injects.dom + injects.ws);
     htmlDocument = htmlDocument.replace(/integrity(?=\=(?="sha(256|384|512)-))/g, '__CROS_integrity')
     return htmlDocument;
 }
@@ -274,11 +286,7 @@ async function parseJS(code, url) {
     code = 'try{__CORS_SCRIPT_LOADED.push(\''+ url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocation);
     return code;
 }
-try {
-    
-} catch (error) {
-    
-}
+
 // loads the old request data to a new one
 async function reqInit(request) {
     const body = await request.blob();
@@ -322,13 +330,21 @@ async function signalHandler(request, reqUrl, clientID) {
  * @param {*} fetchInit 
  * @returns 
  */
-async function fetchRespond(request, fetchDes, fetchInit = undefined) {
+async function fetchRespond(request, clientID, fetchDes, fetchInit = undefined) {
     
-    // trying to use mandatory timeout to bypass integrity lol (and ofcourse it failed)
-    // const response = (await Promise.all([fetch(fetchDes, fetchInit), sleep(100)]))[0]; 
     const response = await fetch(fetchDes, fetchInit); 
-
     if (response.status == 0) return response;
+
+    if (request.mode == 'navigate') {
+        const url = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
+        try {
+            if (frames[clientID]) frames[clientID].CURRENT_URL = new URL(url);
+            else frames[clientID] = { CURRENT_URL: new URL(url) };
+        } catch (e) {
+            console.log('C_URL_ERR')
+        }
+
+    }
     const contentType = response.headers.get('content-type');
     if (contentType && typeof contentType == 'string') {
         if (contentType.includes('/javascript')) {
@@ -364,16 +380,16 @@ async function requestHandler(event, clientID) {
     let CURRENT_URL = frames[clientID] ? frames[clientID].CURRENT_URL : null;
     if (requestURL.pathname.startsWith('/sw-signal/')) {
         return signalHandler(request, requestURL.pathname, clientID);
-    }else if (requestURL.pathname.startsWith('/local/')) {
+    }else if (/^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
+        return await fetchRespond(request, clientID , request)
+    }else if (requestURL.pathname.startsWith('/local/') || !CURRENT_URL) {
         requestURL.pathname = requestURL.pathname.substring(7);
         return await fetch(requestURL);
-    }else if (!CURRENT_URL || /^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
-        return await fetchRespond(request, request)
     }
     
     const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
 
     return url.match(/https?:\/\//g).length > 2
-        ? await fetchRespond(request, request.url, await reqInit(request))
-        : await fetchRespond(request, CROS_SERVER_ENDPOINT + url, await reqInit(request));
+        ? await fetchRespond(request, clientID, request.url, await reqInit(request))
+        : await fetchRespond(request, clientID, CROS_SERVER_ENDPOINT + url, await reqInit(request));
 }
