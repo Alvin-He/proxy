@@ -201,6 +201,11 @@ self.addEventListener("message", async function (event){
             frames[client.id] = {
                 CURRENT_URL: new URL(event.data.url),
             }
+        }else if (event.data.type == 'LOCATION_BASE'){
+            client.postMessage({
+                type: 'LOCATION_BASE',
+                location: frames[client.id]
+            })
         };
     }
      

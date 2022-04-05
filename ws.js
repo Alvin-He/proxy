@@ -104,7 +104,7 @@ class ws extends EventTarget {
             })
         }
 
-        sw.addEventListener('message', (event) => {
+        sw.addEventListener('message', async (event) => {
             if (event.data) {
                 const data = event.data;
                 const id = data.SOCKET_ID;
@@ -183,10 +183,24 @@ class ws extends EventTarget {
 WebSocket = ws;
 console.log('WebSocket overwritten') 
 
+// the client pings the sw when there's a change expected in the url
+
 let __CORS_SCRIPT_LOADED = []; // a list of scripts that's loaded'
 
 const __CORS_browsePreset = '/browse/';
-const __CORS_user_location = () => { return new URL(location.pathname.substring(8)) }
+let __CORS_base
+sw.addEventListener('message', async (event) => {
+    if (event.data.type == 'LOCATION_BASE') {
+        __CORS_base = event.data.location;
+    }
+});
+async function update_base() {
+    sw.postMessage({
+        type: 'LOCATION_BASE'
+    });
+}
+update_base();
+const __CORS_user_location = () => { return __CORS_base }
 let _location = {
     get search() { return location.search; },
     set search(value) { location.search = value; },
