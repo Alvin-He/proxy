@@ -297,12 +297,12 @@ function requestListener(req, res) {
             }
             console.log(targetURL.indexOf('local/'))
             if (targetURL.indexOf('local/') == 0) {
-                for (const path of localResource) {
-                    if (path == targetURL) {
-                        localServerResponse(path, res);
-                        return true;
-                    }
-                }
+                // for (const path of localResource) {
+                    // if (path == targetURL) {
+                        localServerResponse(targetURL.substring(6), res);
+                //         return true;
+                //     }
+                // }
             }
             targetURL = new URL(targetURL);
 
