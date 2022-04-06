@@ -289,7 +289,7 @@ function requestListener(req, res) {
 
         try {
             targetURL = req.url.substring(1);
-            console.log(targetURL);
+            console.log('target: ' + targetURL);
             // local resource loading, local resource overrides cookies
             if (targetURL == '') {
                 localServerResponse('client.html', res); 
