@@ -295,7 +295,7 @@ function requestListener(req, res) {
                 localServerResponse('client.html', res); 
                 return true;
             }
-            if (targetURL.startsWith('local/')) {
+            if (targetURL.indexOf('local/') == 0) {
                 for (const path of localResource) {
                     if (path == targetURL) {
                         localServerResponse(path, res);
