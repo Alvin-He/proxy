@@ -41,7 +41,7 @@ const localResource = [ // local resource that the client can access
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
-const ENGINE = process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS ? 'GLITCH' : process.env.XDG_CONFIG_HOME ? 'REPLIT' : 'NATIVE'
+const HTTPS_PASSTHROUGH = !!(process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS || process.env.XDG_CONFIG_HOME || process.env.ISHEROKU || false)
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
 const DIR_PATH = './' //process.env.DIR_PATH ? process.env.DIR_PATH : (ENGINE == 'NATIVE' ? './' : './');
@@ -439,12 +439,12 @@ function upgradeListener(req, clientSocket, head) {
     console.log(DIR_PATH);
 
     // Create the server
-    const proxy = ENGINE == 'NATIVE' ? 
+    const proxy = HTTPS_PASSTHROUGH ? 
+        http.createServer():// we use http on on non Natvie engines because it's already https by default
         https.createServer({
             key: fs.readFileSync( DIR_PATH + 'etc/key.pem' ),
             cert: fs.readFileSync(DIR_PATH + 'etc/cert.pem'),
-        }) 
-        : http.createServer() // we use http on on non Natvie engines because it's already https by default
+        }); 
         
     // add listeners 
     proxy.on('request', requestListener);
@@ -452,7 +452,7 @@ function upgradeListener(req, clientSocket, head) {
 
     // boot the server
     proxy.listen(PORT, HOST, () => {
-        console.log('Running on ' + HOST + ':' + PORT + ' Engine: ' + ENGINE);
+        console.log('Running on ' + HOST + ':' + PORT + ' Https Passthrough: ' + HTTPS_PASSTHROUGH);
 
         /* TEST: 
         function test(url, noDATA) {
