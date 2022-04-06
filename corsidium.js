@@ -299,6 +299,7 @@ function requestListener(req, res) {
             if (targetURL.indexOf('local/') == 0) {
                 // for (const path of localResource) {
                     // if (path == targetURL) {
+                        console.log('passed')
                         localServerResponse(targetURL.substring(6), res);
                 //         return true;
                 //     }
