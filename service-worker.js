@@ -388,7 +388,6 @@ async function requestHandler(event, clientID) {
     }else if (/^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
         return await fetchRespond(request, clientID , request)
     }else if (requestURL.pathname.startsWith('/local/') || !CURRENT_URL) {
-        requestURL.pathname = requestURL.pathname.substring(7);
         return await fetch(requestURL);
     }
     

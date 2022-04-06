@@ -295,10 +295,12 @@ function requestListener(req, res) {
                 localServerResponse('client.html', res); 
                 return true;
             }
-            for (const path of localResource) {
-                if (path == targetURL) {
-                    localServerResponse(path, res);
-                    return true;
+            if (targetURL.startsWith('local/')) {
+                for (const path of localResource) {
+                    if (path == targetURL) {
+                        localServerResponse(path, res);
+                        return true;
+                    }
                 }
             }
             targetURL = new URL(targetURL);
