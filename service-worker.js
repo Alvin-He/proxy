@@ -8,7 +8,7 @@
  * It should show the same url as the address bar if the user's browsing the url directly from the browser (no proxy)
  * All redirects should refelect on the url
  */
-const CROS_SERVER_ENDPOINT = new URL (serviceWorker.scriptURL.substring(0, serviceWorker.scriptURL.length - 'service-worker.js'.length)); //'https://cros-proxy-testing.glitch.me/'
+const CROS_SERVER_ENDPOINT = new URL(new URL (serviceWorker.scriptURL).origin)
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
