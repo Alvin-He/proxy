@@ -191,11 +191,11 @@ const __CORS_browsePreset = '/browse/';
 let __CORS_base
 sw.addEventListener('message', async (event) => {
     if (event.data.type == 'LOCATION_BASE') {
-        __CORS_base = event.data.location;
+        __CORS_base = new URL(event.data.location);
     }
 });
 async function update_base() {
-    sw.postMessage({
+    sw.controller.postMessage({
         type: 'LOCATION_BASE'
     });
 }

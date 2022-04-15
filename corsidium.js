@@ -290,20 +290,6 @@ function requestListener(req, res) {
         try {
             targetURL = req.url.substring(1);
             console.log('target: ' + targetURL);
-            // local resource loading, local resource overrides cookies
-            if (targetURL == '') {
-                localServerResponse('client.html', res); 
-                return true;
-            }
-            console.log(targetURL.substring(6))
-            if (targetURL.indexOf('local/') == 0) {
-                // for (const path of localResource) {
-                    // if (path == targetURL) {
-                        localServerResponse(targetURL.substring(6), res);
-                        return true;
-                //     }
-                // }
-            }
             targetURL = new URL(targetURL);
 
             // final check before making the request 
@@ -325,7 +311,19 @@ function requestListener(req, res) {
                 console.log('Invalid host: ' + targetURL.hostname);
                 return false; 
             }
-        } catch (error) { // this'll fire when new URL (targetURL) errored; In case we get an invalid URL
+        } catch (error) { // this'll fire when new URL (targetURL) errored; In case we get an invalid URL or local 
+            // local resource loading
+            if (targetURL == '') {
+                localServerResponse('client.html', res);
+                return true;
+            }
+            console.log(targetURL.substring(6))
+            for (const path of localResource) {
+                if (path == targetURL) {
+                    localServerResponse(targetURL, res);
+                    return true;
+                }
+            }
             res.writeHead(404, 'Invalid URL');
             res.end('Invalid URL ' + targetURL);
             console.log('Invalid URL ' + targetURL);

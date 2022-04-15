@@ -44,18 +44,19 @@ let frames = {
 const reg_exprTerm = /;|}|\s/;
 
 const injects = {
-    ws: '<script src="/local/ws.js"></script>',
-    dom: '<script src="/local/DOM.js"></script>',
+    ws: '<script src="/ws.js"></script>',
+    dom: '<script src="/DOM.js"></script>',
     redirEndPoint: CROS_SERVER_ENDPOINT.origin + '/sw-signal/navigate/', //'sw-signal/anchor-navigate/',
-    winLocation: '__CORS_location',
+    winLocationNonAssign: 'location',//'__CORS_location',
+    winLocationAssign: 'win.location'
 }
 
 const localResource = [ // local resource that the client can access
-    'ws.js',
-    'DOM.js',
-    'index.js',
-    'client.html',
-    'service-worker.js'
+    '/ws.js',
+    '/DOM.js',
+    '/index.js',
+    '/client.html',
+    '/service-worker.js'
 ]
 
 // Escaping a string into a regexp, https://stackoverflow.com/a/494122
@@ -204,7 +205,7 @@ self.addEventListener("message", async function (event){
         }else if (event.data.type == 'LOCATION_BASE'){
             client.postMessage({
                 type: 'LOCATION_BASE',
-                location: frames[client.id]
+                location: frames[client.id] ? frames[client.id].CURRENT_URL.href : CROS_SERVER_ENDPOINT.href
             })
         };
     }
@@ -286,9 +287,31 @@ async function parseHTML(htmlDocument) {
  * @param {String} code 
  * @returns 
  */
+let reg = /(?<=[;\s\(\{\}\+\=])(?:(window|document|this)\.)?(?:location)([;\.\s\)\}\+\=])/g
 async function parseJS(code, url) {
     if (code.length < 1) return null;
-    code = 'try{__CORS_SCRIPT_LOADED.push(\''+ url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocation);
+    code = 'try{__CORS_SCRIPT_LOADED.push(\''+ url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=\:])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocationNonAssign); 
+    // let replaceIndex = [
+    //     {type: 0, index: NaN}
+    // ];
+    // for (let m; m = reg.exec(code);) {
+    //     const index = m.index;
+    //     // for (let i = index; i > 0; i--) 
+    //     let i = 1;
+    //     while(/\s/.test(code[index - 1])) i++ // repeat until we find a non-whitespace character
+    //     while (code[index - i] == '(') i++; // repeat until we're out of left brakets
+    //     if (code[index - (i + 1)] == '{') { // if we hit a brace, then they are using {name:{location}}
+    //         replaceIndex.push({
+    //             type: 1, // 1 means that we'll have to replace it with location:win.location
+    //             index: m.index
+    //         })
+    //     }
+
+    //     replaceIndex.push({
+    //         type: 0, // 0 means normal op
+    //         index: m.index
+    //     })
+    // }
     return code;
 }
 
@@ -385,12 +408,16 @@ async function requestHandler(event, clientID) {
     let CURRENT_URL = frames[clientID] ? frames[clientID].CURRENT_URL : null;
     if (requestURL.pathname.startsWith('/sw-signal/')) {
         return signalHandler(request, requestURL.pathname, clientID);
-    }else if (/^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
-        return await fetchRespond(request, clientID , request)
-    }else if (requestURL.pathname.startsWith('/local/') || !CURRENT_URL) {
+    } else if (!CURRENT_URL) {
         return await fetch(requestURL);
+    } else if (/^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
+        return await fetchRespond(request, clientID , request)
+    } 
+    for (let i = 0; i < localResource.length; i++) {
+        if (requestURL.pathname == localResource[i]) {
+            return await fetch(requestURL);
+        }
     }
-    
     const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
 
     return url.match(/https?:\/\//g).length > 2
