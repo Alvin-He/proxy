@@ -44,6 +44,7 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const HTTPS_PASSTHROUGH = !!(process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS || process.env.XDG_CONFIG_HOME || process.env.ISHEROKU || false)
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
+const DOMAIN = process.env.DOMAIN || 'https://127.0.0.1:3000/'
 const DIR_PATH = './' //process.env.DIR_PATH ? process.env.DIR_PATH : (ENGINE == 'NATIVE' ? './' : './');
 const SSL_KEY_LOG_FILE = process.env.SSLKEYLOGFILE ? fs.createWriteStream(process.env.SSLKEYLOGFILE, { flags: 'a' }) : null;
 if (SSL_KEY_LOG_FILE) { process.on('exit', () => SSL_KEY_LOG_FILE.end()); } // close the log file
@@ -205,7 +206,7 @@ function proxyResponse(proxyReq, proxyRes, clientReq, clientRes) {
     if (statusCode > 300 && statusCode < 400){ //redirect response handling, skipping 300 since it requires user agent(browser)
         let locationHeader = proxyRes.headers.location //resolve(proxyReq.url.href, proxyRes.headers.location)
         if (locationHeader && /^https?:\/\//.test(locationHeader)) {
-            locationHeader = 'https://127.0.0.1:3000/' + locationHeader;
+            locationHeader = DOMAIN + locationHeader;
             console.log('Redirecting to: ' + locationHeader)
             console.log(proxyReq.url.href)
             proxyRes.headers.location = locationHeader;

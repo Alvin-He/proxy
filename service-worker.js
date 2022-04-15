@@ -65,6 +65,7 @@ RegExp.escape = function (str) {
 };
 
 const REGEXP_CROS_SERVER_ENDPOINT = new RegExp(RegExp.escape(CROS_SERVER_ENDPOINT.origin + '/'));
+const REGEXP_REDIR = new RegExp(RegExp.escape(CROS_SERVER_ENDPOINT.href) + 'https?:\/\/');
 // Utilities END
 
 // Listeners
@@ -410,7 +411,7 @@ async function requestHandler(event, clientID) {
         return signalHandler(request, requestURL.pathname, clientID);
     } else if (!CURRENT_URL) {
         return await fetch(requestURL);
-    } else if (/^https:\/\/127.0.0.1:3000\/https?:\/\//.test(request.url)) {
+    } else if (REGEXP_REDIR.test(request.url)) {
         return await fetchRespond(request, clientID , request)
     } 
     for (let i = 0; i < localResource.length; i++) {
