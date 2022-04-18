@@ -2,23 +2,20 @@
 const sw = navigator.serviceWorker
 
 let notifyCallback = {}
-new Promise((resolve, reject) => {
-async function LCPP_NOTIFY(url) {
-    notifyCallback[url] = (status) => {
-        if (status == 'ok') {
 
-        }
-    }
-    sw.controller.postMessage({
-        type: 'LCPP_NOTIFY',
-        url: url
+function LCPP_NOTIFY(url) {
+    return new Promise((resolve, reject) => {
+        sw.addEventListener('message', (e) => {
+            if (e.data.type == 'LCPP_NOTIFY' && e.data.url == url) {
+                sw.removeEventListener('message', e);
+                resolve(e.data.status);
+            }
+        });
+        sw.controller.postMessage({
+            type: 'LCPP_NOTIFY',
+            url: url
+        });
     });
-    sw.addEventListener('message', (e) => {
-        if (e.data.type == 'LCPP_NOTIFY') {
-
-        }
-    });
-    return res
 }
 
 const preSets = {
@@ -227,6 +224,8 @@ class nws extends EventTarget {
     constructor (url, protocols) {
         super() // EventTarget initialization
         this.__CROS_target_url = url;
+        let tURL = new URL(url);
+        tURL.searchParams.append('__CROS_LCPP_WS_ORIGIN')
         this.__CROS_ws_sock = new ref_ws('wss://' + window.location.host + '/ws/' + url, protocols);
         // list of listener variables
         this.__CROS_ws_internal_listeners = {
