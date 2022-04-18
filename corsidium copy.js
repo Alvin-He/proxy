@@ -343,56 +343,95 @@ function upgradeListener(req, clientSocket, head) {
     // console.log('upgrade');
     console.log(req.url)
     // extract the identifier from the request url
-    if (req.url.substring(0, 4) == '/ws/') {
-        try {
-            const target = new URL(req.url.substring(4));
+    let path = req.url.substring(1).split('/');
+    const identifier = path.pop();
+    // const url = path.join('/'); // the target url
+
+    // LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
+    if (/^LCPP-.*-\d*-.*-CROS$/.test(identifier)) {
+        const identifierArray = identifier.split('-');
+        const hash = identifierArray[1];
+        const time = identifierArray[2];
+        const uuid = identifierArray[3];
+        if (SERVER_GLOBAL.LCPP[hash]) { // hash match 
+            const requestInfo = Array.from(SERVER_GLOBAL.LCPP[hash]); // copy the array 
+            // console.log('INFO: ')
+            console.log(requestInfo);
+            const client = requestInfo[0];
+            const origin = new URL(requestInfo[1]);
+            let target = new URL(requestInfo[2]);
             const port = target.port || target.protocol == 'wss:' ? 443 : 80;
-            
-            const proxySocket = tls.connect({
-                isServer: false,
-                host: target.hostname,
-                port: port,
-                // rejectUnauthorized: false,
-                servername: target.hostname,
-            }, () => {
-                //generate a websocket upgrade request since we already used it
-                proxySocket.write('GET ' + target.href + ' HTTP/1.1\r\n'); // let the server know we are upgrading
-                req.rawHeaders.forEach((value, index) => {
-                    if (index % 2 == 0) {
-                        if (/host/i.test(value)) {
-                            proxySocket.write(value + ': ' + target.hostname + '\r\n');
-                        } else if (/origin/i.test(value)) {
-                            ;// proxySocket.write(value + ': ' + target.origin + '\r\n');
-                        } else if (/cookie/i.test(value)) {
-                            ; // do nothing 
-                        } else {
-                            proxySocket.write(value + ': ' + req.rawHeaders[index + 1] + '\r\n');
+            // a 1 minute timeout for the client to connect, otherwise the client will be disconnected
+            //&& Number(new Date()) - Number(time) < 60000
+            if (client == uuid ) { // id and time out 
+                console.log('LCPP-OK')
+                delete SERVER_GLOBAL.LCPP[hash]; // delete the hash from the LCPP
+                // wsRedirect(target, origin, req.headers, clientSocket);
+                const proxySocket = tls.connect({
+                    isServer: false,
+                    host: target.hostname,
+                    port: port,
+                    // rejectUnauthorized: false,
+                    servername: target.hostname,
+                }, () => {
+                // const proxySocket = net.createConnection(port, target.hostname, () => {
+
+                    // TODO: generate a websocket upgrade request since we already used it
+                    proxySocket.write('GET ' + target.href + ' HTTP/1.1\r\n'); // let the server know we are upgrading
+                    req.rawHeaders.forEach((value, index) => {
+                        if (index % 2 == 0) {
+                            if (/host/i.test(value)) {
+                                proxySocket.write(value + ': ' + target.hostname + '\r\n');
+                            } else if (/origin/i.test(value)) {
+                                proxySocket.write(value + ': ' + origin.origin + '\r\n');
+                            } else if (/cookie/i.test(value)) {
+                                ; // do nothing 
+                            }else{
+                                proxySocket.write(value + ': ' + req.rawHeaders[index + 1] + '\r\n');
+                            }
                         }
-                    }
+                    });
+                    proxySocket.write('\r\n'); // end of headers
+                    // console.log('request sent');
+
+                    // socket.write(head); // write the request body from the client 
+                    proxySocket.pipe(clientSocket);
+                    clientSocket.pipe(proxySocket);
+                    
                 });
-                proxySocket.write('\r\n'); // end of headers
-                console.log('request sent');
+                proxySocket.on('data', (data) => {console.log( 'Target Incoming: ', data.toString())});
+                clientSocket.on('data', (data) => {console.log( 'client Incoming: ', data.toString())});
+                if (SSL_KEY_LOG_FILE) {proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line));}
 
-                // socket.write(head); // write the request body from the client 
-                proxySocket.pipe(clientSocket);
-                clientSocket.pipe(proxySocket);
-            });
-            proxySocket.on('data', (data) => { console.log('Target Incoming: ', data.toString()) });
-            clientSocket.on('data', (data) => { console.log('client Incoming: ', data.toString()) });
-            if (SSL_KEY_LOG_FILE) { proxySocket.on('keylog', (line) => SSL_KEY_LOG_FILE.write(line)); }
-
-            proxySocket.on('error', (error) => { console.log('Proxy Socket Error: ' + error) });
-            clientSocket.on('error', (error) => { console.log('Client Socket Error: ' + error) });
-            proxySocket.on('close', () => { clientSocket.destroy(); });
-            clientSocket.on('close', () => { proxySocket.destroy(); });
-            return true;
-        } catch (error) {
-            console.log(error)
+                proxySocket.on('error', (error) => {console.log('Proxy Socket Error: ' + error)});
+                clientSocket.on('error', (error) => {console.log('Client Socket Error: ' + error)});
+                proxySocket.on('close', () => {
+                    clientSocket.destroy();
+                });
+                clientSocket.on('close', () => {
+                    proxySocket.destroy();
+                });
+            }
         }
+    } else {
+        console.log('LCPP-ERROR')
+        clientSocket.destroy();
     }
-    console.log('upgrade failed');
-    clientSocket.destroy();
-    return false;
+
+    // const key = req.headers['sec-websocket-key'] ? req.headers['sec-websocket-key'] : abortHandshake(clientSocket, 400)
+
+    // const digest = createHash('sha1').update(key + WS_GUID).digest('base64')
+
+    // clientSocket.write(
+    // 'HTTP/1.1 101 Switching Protocols\r\n' +
+    // 'Upgrade: websocket\r\n' + 
+    // 'Connection: Upgrade\r\n' + 
+    // 'Sec-WebSocket-Accept: ' + digest + '\r\n' +
+    // '\r\n');
+
+    // clientSocket.on('data', (buffer) => {
+    //     console.log(buffer.readBigUInt64LE())
+    // })
 }
 
 // Async calls 

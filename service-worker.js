@@ -47,7 +47,7 @@ const injects = {
     ws: '<script src="/ws.js"></script>',
     dom: '<script src="/DOM.js"></script>',
     redirEndPoint: CROS_SERVER_ENDPOINT.origin + '/sw-signal/navigate/', //'sw-signal/anchor-navigate/',
-    winLocationNonAssign: 'location',//'__CORS_location',
+    winLocationNonAssign: '__CORS_location',//'__CORS_location',
     winLocationAssign: 'win.location'
 }
 
@@ -208,6 +208,22 @@ self.addEventListener("message", async function (event){
                 type: 'LOCATION_BASE',
                 location: frames[client.id] ? frames[client.id].CURRENT_URL.href : CROS_SERVER_ENDPOINT.href
             })
+        }else if (event.data.type == 'LCPP_NOTIFY'){
+            const {host, origin, href} = new URL(event.data.url);
+            const identifier = await generateIdentifier(host, origin);
+            if (await notifyServer(identifier, frames[client.id].CURRENT_URL ,event.data.url)) {
+                client.postMessage({
+                    type: 'LCPP_NOTIFY',
+                    status: 'ok',
+                    url: event.data.url
+                })
+            }else{
+                client.postMessage({
+                    type: 'LCPP_NOTIFY',
+                    status: 'failed',
+                    url: event.data.url
+                })
+            }
         };
     }
      
@@ -288,32 +304,47 @@ async function parseHTML(htmlDocument) {
  * @param {String} code 
  * @returns 
  */
-let reg = /(?<=[;\s\(\{\}\+\=])(?:(window|document|this)\.)?(?:location)([;\.\s\)\}\+\=])/g
+let reg = /(?<=[\:\;\s\(\{\}\+\=])(window|document|this)?(?:\.?location)(?:[\,\;\.\s\)\}\+\=])/g
 async function parseJS(code, url) {
     if (code.length < 1) return null;
-    code = 'try{__CORS_SCRIPT_LOADED.push(\''+ url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=\:])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocationNonAssign); 
-    // let replaceIndex = [
-    //     {type: 0, index: NaN}
-    // ];
-    // for (let m; m = reg.exec(code);) {
-    //     const index = m.index;
-    //     // for (let i = index; i > 0; i--) 
-    //     let i = 1;
-    //     while(/\s/.test(code[index - 1])) i++ // repeat until we find a non-whitespace character
-    //     while (code[index - i] == '(') i++; // repeat until we're out of left brakets
-    //     if (code[index - (i + 1)] == '{') { // if we hit a brace, then they are using {name:{location}}
-    //         replaceIndex.push({
-    //             type: 1, // 1 means that we'll have to replace it with location:win.location
-    //             index: m.index
-    //         })
-    //     }
-
-    //     replaceIndex.push({
-    //         type: 0, // 0 means normal op
-    //         index: m.index
-    //     })
-    // }
-    return code;
+    // code = 'try{__CORS_SCRIPT_LOADED.push(\'' + url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=\:])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocationAssign);
+    let replaceIndex = []; // {type: 1 | 0, index:m.index} 
+    for (let m; m = reg.exec(code);) {
+        const index = m.index;
+        if (!m[1]) {
+            let i = 1;
+            while (/\s/.test(code[index - i])) i++ // repeat until we find a non-whitespace character
+            while (code[index - i] == '(') i++; // repeat until we're out of left brakets
+            if (code[index - i] == '{') { // if we hit a brace, then they are using {name:{location}}
+                while (/\s/.test(code[index - i])) i++ // non whitespace again
+                if (code[index - (i + 1)] == ':') {
+                    replaceIndex.push({
+                        type: 1, // 1 means that we'll have to replace it with location:win.location
+                        sIndex: m.index,
+                        eIndex: m.index + m[0].length
+                    });
+                    continue
+                }
+            }
+        }
+        replaceIndex.push({
+            type: 0, // 0 means normal op
+            sIndex: m.index,
+            eIndex: m.index + m[0].length
+        });
+    }
+    let returnVAL = 'try{__CORS_SCRIPT_LOADED.push(\'' + url + '\')}catch(e){};'
+    let previous_eIndex = 0;
+    for (let i = 0; i < replaceIndex.length; i++) {
+        if (replaceIndex[i].type == 0) {
+            returnVAL += code.slice(previous_eIndex, replaceIndex[i].sIndex) + injects.winLocationAssign
+        } else {
+            returnVAL += code.slice(previous_eIndex, replaceIndex[i].sIndex) + injects.winLocationNonAssign
+        }
+        previous_eIndex = replaceIndex[i].eIndex - 1;
+    }
+    returnVAL += code.slice(previous_eIndex);
+    return returnVAL;
 }
 
 // loads the old request data to a new one
@@ -410,6 +441,7 @@ async function requestHandler(event, clientID) {
     if (requestURL.pathname.startsWith('/sw-signal/')) {
         return signalHandler(request, requestURL.pathname, clientID);
     } else if (!CURRENT_URL) {
+        console.warn('N_CURRENT_URL req:' + requestURL.href);
         return await fetch(requestURL);
     } else if (REGEXP_REDIR.test(request.url)) {
         return await fetchRespond(request, clientID , request)
