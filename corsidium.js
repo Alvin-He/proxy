@@ -346,6 +346,8 @@ function upgradeListener(req, clientSocket, head) {
     if (req.url.substring(0, 4) == '/ws/') {
         try {
             const target = new URL(req.url.substring(4));
+            const origin = new URl(target.searchParams.get('__CROS_LCPP_WS_ORIGIN'));  
+            target.searchParams.delete('__CROS_LCPP_WS_ORIGIN')
             const port = target.port || target.protocol == 'wss:' ? 443 : 80;
             
             const proxySocket = tls.connect({
@@ -362,7 +364,7 @@ function upgradeListener(req, clientSocket, head) {
                         if (/host/i.test(value)) {
                             proxySocket.write(value + ': ' + target.hostname + '\r\n');
                         } else if (/origin/i.test(value)) {
-                            ;// proxySocket.write(value + ': ' + target.origin + '\r\n');
+                            proxySocket.write(value + ': ' + origin + '\r\n');
                         } else if (/cookie/i.test(value)) {
                             ; // do nothing 
                         } else {

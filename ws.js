@@ -225,8 +225,8 @@ class nws extends EventTarget {
         super() // EventTarget initialization
         this.__CROS_target_url = url;
         let tURL = new URL(url);
-        tURL.searchParams.append('__CROS_LCPP_WS_ORIGIN')
-        this.__CROS_ws_sock = new ref_ws('wss://' + window.location.host + '/ws/' + url, protocols);
+        tURL.searchParams.append('__CROS_LCPP_WS_ORIGIN', __CROS_origin)
+        this.__CROS_ws_sock = new ref_ws('wss://' + window.location.host + '/ws/' + tURL.href, protocols);
         // list of listener variables
         this.__CROS_ws_internal_listeners = {
             onclose: undefined,

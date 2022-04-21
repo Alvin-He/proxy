@@ -448,6 +448,10 @@ async function requestHandler(event, clientID) {
     } 
     for (let i = 0; i < localResource.length; i++) {
         if (requestURL.pathname == localResource[i]) {
+            if (i == 0) {
+                let res = await fetch(requestURL); 
+                return new Response('let __CROS_origin=`' + CURRENT_URL.href + '`;' + await res.text())
+            }
             return await fetch(requestURL);
         }
     }
