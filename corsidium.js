@@ -346,7 +346,7 @@ function upgradeListener(req, clientSocket, head) {
     if (req.url.substring(0, 4) == '/ws/') {
         try {
             const target = new URL(req.url.substring(4));
-            const origin = new URl(target.searchParams.get('__CROS_LCPP_WS_ORIGIN'));  
+            const origin = new URL(target.searchParams.get('__CROS_LCPP_WS_ORIGIN'));  
             target.searchParams.delete('__CROS_LCPP_WS_ORIGIN')
             const port = target.port || target.protocol == 'wss:' ? 443 : 80;
             
