@@ -193,6 +193,39 @@ async function parseHTML(htmlDocument) {
     htmlDocument = htmlDocument.replace(/(?<=\<head.*\>)\s*(?=\<)/, injects.dom + injects.ws);
     htmlDocument = htmlDocument.replace(/integrity(?=\=(?="sha(256|384|512)-))/g, '__CROS_integrity')
     return htmlDocument;
+    // TODO: better search algr
+    // TODO: find script tags in html and parse them
+
+    const reg = {
+        h1 = /\<head/, // head start 
+        h2 = /\>/, // head end
+    }
+    let hStartIndex = htmlDocument.indexOf('<head') + 5;
+    let isEsc = false; 
+    while (hStartIndex++) {
+
+        switch (htmlDocument[hStartIndex]) {
+            case '/': 
+
+            case '>': 
+
+            case '=':
+                while (/\s/.test(htmlDocument[++hStartIndex]));// repeat out whitespace
+
+
+        }
+
+        if (htmlDocument[hStartIndex] == '/') {
+            while (hStartIndex++) {
+                if (htmlDocument[hStartIndex] == '>') {
+                    
+                    
+                    break
+                }
+            }            
+            break
+        }
+    }
 }
 
 // performance: ~130ms pre call :(
