@@ -196,47 +196,29 @@ async function parseHTML(htmlDocument) {
     // TODO: better search algr
     // TODO: find script tags in html and parse them
 
-    let operations = {
-        
-    }
+    // let operations = [];
 
-    const reg = {
-        h1: /\<head/, // head start 
-        h2: /\>/, // head end
-    }
-    // 0.5 ms
-    let hStartIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
+    // const reg = {
+    //     header: /(?<=\<head.*\>)\s*(?=\<)/,
+    //     script: /(?<=\<script.*\>)\s*(?=\<)/
+    // }
+    // // script inject, regex time: 0.5 ms, esti tot time: 1 ms
+    // let scriptInjectIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
+    // operations.push({
+    //     index: scriptInjectIndex,
+    //     operation: 'insert',
+    //     value: injects.dom + injects.ws
+    // });
+
+    // // this acts as a conditional loop for the parsing, exec returns null if the regex doesn't match
+    // // and it gets passed to the for loop's conditional check making, the loop run until it doesn't, simpler while loop
+    // for (let match; match = script.exec(htmlDocument);) {
+    //     const index = match.index;
+        
+
     
 
-    let isEsc = false; 
-    let quoteType = ''; 
-    while (hStartIndex++) {
-
-        switch (htmlDocument[hStartIndex]) {
-            case '/': 
-
-            case '>': 
-
-            case '=':
-                while (/\s/.test(htmlDocument[++hStartIndex]));// repeat out whitespace
-                if (htmlDocument[hStartIndex] == '"') {
-
-                }
-
-
-        }
-
-        if (htmlDocument[hStartIndex] == '/') {
-            while (hStartIndex++) {
-                if (htmlDocument[hStartIndex] == '>') {
-                    
-                    
-                    break
-                }
-            }            
-            break
-        }
-    }
+    // return htmlDocument;
 }
 
 // performance: ~130ms pre call :(
@@ -250,9 +232,9 @@ async function parseJS(code, url) {
     if (code.length < 1) return null;
     // code = 'try{__CORS_SCRIPT_LOADED.push(\'' + url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=\:])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocationAssign);
     let replaceIndex = []; // {type: 1 | 0, index:m.index} 
-    for (let m; m = reg.exec(code);) {
-        const index = m.index;
-        if (!m[1]) {
+    for (let match; match = reg.exec(code);) {
+        const index = match.index;
+        if (!match[1]) {
             let i = 1;
             while (/\s/.test(code[index - i])) i++ // repeat until we find a non-whitespace character
             while (code[index - i] == '(') i++; // repeat until we're out of left brakets
@@ -261,8 +243,8 @@ async function parseJS(code, url) {
                 if (code[index - (i + 1)] == ':') {
                     replaceIndex.push({
                         type: 1, // 1 means that we'll have to replace it with location:win.location
-                        sIndex: m.index,
-                        eIndex: m.index + m[0].length
+                        sIndex: match.index,
+                        eIndex: match.index + match[0].length
                     });
                     continue
                 }
@@ -270,8 +252,8 @@ async function parseJS(code, url) {
         }
         replaceIndex.push({
             type: 0, // 0 means normal op
-            sIndex: m.index,
-            eIndex: m.index + m[0].length
+            sIndex: match.index,
+            eIndex: match.index + match[0].length
         });
     }
     let returnVAL = 'try{__CORS_SCRIPT_LOADED.push(\'' + url + '\')}catch(e){};'
