@@ -201,8 +201,8 @@ async function parseHTML(htmlDocument) {
     }
 
     const reg = {
-        h1 = /\<head/, // head start 
-        h2 = /\>/, // head end
+        h1: /\<head/, // head start 
+        h2: /\>/, // head end
     }
     // 0.5 ms
     let hStartIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
