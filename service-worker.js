@@ -196,12 +196,20 @@ async function parseHTML(htmlDocument) {
     // TODO: better search algr
     // TODO: find script tags in html and parse them
 
+    let operations = {
+        
+    }
+
     const reg = {
         h1 = /\<head/, // head start 
         h2 = /\>/, // head end
     }
-    let hStartIndex = htmlDocument.indexOf('<head') + 5;
+    // 0.5 ms
+    let hStartIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
+    
+
     let isEsc = false; 
+    let quoteType = ''; 
     while (hStartIndex++) {
 
         switch (htmlDocument[hStartIndex]) {
@@ -211,6 +219,9 @@ async function parseHTML(htmlDocument) {
 
             case '=':
                 while (/\s/.test(htmlDocument[++hStartIndex]));// repeat out whitespace
+                if (htmlDocument[hStartIndex] == '"') {
+
+                }
 
 
         }
