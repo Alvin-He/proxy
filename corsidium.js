@@ -41,7 +41,7 @@ const localResource = [ // local resource that the client can access
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
-const HTTPS_PASSTHROUGH = !!(process.env.GLITCH_SHARED_INCLUDES_LEGACY_CLS || process.env.XDG_CONFIG_HOME || process.env.ISHEROKU || false)
+const HTTPS_PASSTHROUGH = !!(process.env.HTTPS_PASSTHROUGH)
 const HOST = process.env.HOST || '127.0.0.1' 
 const PORT = process.env.PORT || 3000
 const DOMAIN = process.env.DOMAIN || 'https://127.0.0.1:3000/'
