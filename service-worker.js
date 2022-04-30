@@ -196,29 +196,40 @@ async function parseHTML(htmlDocument) {
     // TODO: better search algr
     // TODO: find script tags in html and parse them
 
-    let operations = [];
+    // let operations = [];
 
-    const reg = {
-        header: /(?<=\<head.*\>)\s*(?=\<)/,
-        scriptStart: /\<script/,
-        script: /(?<=\<script.*\>)\s*(?=\<)/
-    }
-    // script inject, regex time: 0.5 ms, esti tot time: 1 ms
-    let scriptInjectIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
-    operations.push({
-        index: scriptInjectIndex,
-        operation: 'insert',
-        value: injects.dom + injects.ws
-    });
+    // const reg = {
+    //     header: /(?<=\<head.*\>)\s*(?=\<)/,
+    //     scriptStart: /\<script/,
+    //     // Unexpected behavior on ` 'xxx'>xxx<script> ` doesn't match the first `>`. case specific, small hit rate, performance trade off not worth it
+    //     // <0.1 ms/10 match in 200 char - 1300±100 steps  
+    //     scriptAttr: /(?:(?:\s*?)([^\s]+?)(?:(?:\s*?=\s*?(?:'|").*?(?:'|"))?)|(?:\s*?(>)))/g,
+    //     script: /(?<=\<script.*\>)\s*(?=\<)/
+    // }
+    // // script inject, regex time: 0.5 ms, esti tot time: 1 ms
+    // let scriptInjectIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
+    // operations.push({
+    //     index: scriptInjectIndex,
+    //     operation: 'insert',
+    //     value: injects.dom + injects.ws
+    // });
 
-    // this acts as a conditional loop for the parsing, exec returns null if the regex doesn't match
-    // and it gets passed to the for loop's conditional check making, the loop run until it doesn't, simpler while loop
-    for (let index = 0; index != -1; index = htmlDocument.indexOf('<script', index)) { // finds the start of a script tag
-                
-
-    
-    }
-    return htmlDocument;
+    // for (let index = 0; index != -1; index = htmlDocument.indexOf('<script', index)) { // finds the start of a script tag
+    //     reg.scriptAttr.lastIndex = index; // sets the regex to the start of the script tag
+    //     // the second match signals stop, inverting that and passing it to for's condition acts as: `!match[1]`
+    //     for (let match; !((match = reg.scriptAttr.exec(htmlDocument))[1]);) {
+    //         const attribute = match[0];
+    //         if (attribute == 'integrity') {
+    //             operations.push({
+    //                 startIndex: match.index,
+    //                 endIndex: match.index + attribute.length,
+    //                 operation: 'replace',
+    //                 value: '__CROS_integrity'
+    //             });
+    //         }
+    //     }
+    // }
+    // return htmlDocument;
 }
 
 // performance: ~130ms pre call :(
