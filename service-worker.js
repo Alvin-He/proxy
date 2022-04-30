@@ -196,29 +196,29 @@ async function parseHTML(htmlDocument) {
     // TODO: better search algr
     // TODO: find script tags in html and parse them
 
-    // let operations = [];
+    let operations = [];
 
-    // const reg = {
-    //     header: /(?<=\<head.*\>)\s*(?=\<)/,
-    //     script: /(?<=\<script.*\>)\s*(?=\<)/
-    // }
-    // // script inject, regex time: 0.5 ms, esti tot time: 1 ms
-    // let scriptInjectIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
-    // operations.push({
-    //     index: scriptInjectIndex,
-    //     operation: 'insert',
-    //     value: injects.dom + injects.ws
-    // });
+    const reg = {
+        header: /(?<=\<head.*\>)\s*(?=\<)/,
+        scriptStart: /\<script/,
+        script: /(?<=\<script.*\>)\s*(?=\<)/
+    }
+    // script inject, regex time: 0.5 ms, esti tot time: 1 ms
+    let scriptInjectIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
+    operations.push({
+        index: scriptInjectIndex,
+        operation: 'insert',
+        value: injects.dom + injects.ws
+    });
 
-    // // this acts as a conditional loop for the parsing, exec returns null if the regex doesn't match
-    // // and it gets passed to the for loop's conditional check making, the loop run until it doesn't, simpler while loop
-    // for (let match; match = script.exec(htmlDocument);) {
-    //     const index = match.index;
-        
+    // this acts as a conditional loop for the parsing, exec returns null if the regex doesn't match
+    // and it gets passed to the for loop's conditional check making, the loop run until it doesn't, simpler while loop
+    for (let index = 0; index != -1; index = htmlDocument.indexOf('<script', index)) { // finds the start of a script tag
+                
 
     
-
-    // return htmlDocument;
+    }
+    return htmlDocument;
 }
 
 // performance: ~130ms pre call :(
