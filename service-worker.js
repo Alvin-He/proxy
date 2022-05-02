@@ -1,13 +1,7 @@
-/**
- * Domain: https://127.0.0.1:3000/
- * Local proxy resource access path: /local/<path>
- * Browsing path: /browse/<external path to a web page>
- * Serivce worker Signaling path: /sw-signal/<type>/<data>
- * 
- * The Browsing path is the path that the user navigates to.
- * It should show the same url as the address bar if the user's browsing the url directly from the browser (no proxy)
- * All redirects should refelect on the url
- */
+
+
+
+
 const CROS_SERVER_ENDPOINT = new URL(new URL (serviceWorker.scriptURL).origin)
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -189,47 +183,75 @@ async function prefetchDocument(target) {
  * @returns 
  */
 async function parseHTML(htmlDocument) {
+    // 3s load time old
     if (htmlDocument.length < 1) return null; // if the document is empty, return null
-    htmlDocument = htmlDocument.replace(/(?<=\<head.*\>)\s*(?=\<)/, injects.dom + injects.ws);
-    htmlDocument = htmlDocument.replace(/integrity(?=\=(?="sha(256|384|512)-))/g, '__CROS_integrity')
-    return htmlDocument;
+    // htmlDocument = htmlDocument.replace(/(?<=\<head.*\>)\s*(?=\<)/, injects.dom + injects.ws);
+    // htmlDocument = htmlDocument.replace(/integrity(?=\=(?="sha(256|384|512)-))/g, '__CROS_integrity')
+    // return htmlDocument;
     // TODO: better search algr
     // TODO: find script tags in html and parse them
 
-    // let operations = [];
+    let operations = [];
 
-    // const reg = {
-    //     header: /(?<=\<head.*\>)\s*(?=\<)/,
-    //     scriptStart: /\<script/,
-    //     // Unexpected behavior on ` 'xxx'>xxx<script> ` doesn't match the first `>`. case specific, small hit rate, performance trade off not worth it
-    //     // <0.1 ms/10 match in 200 char - 1300±100 steps  
-    //     scriptAttr: /(?:(?:\s*?)([^\s]+?)(?:(?:\s*?=\s*?(?:'|").*?(?:'|"))?)|(?:\s*?(>)))/g,
-    //     script: /(?<=\<script.*\>)\s*(?=\<)/
-    // }
-    // // script inject, regex time: 0.5 ms, esti tot time: 1 ms
-    // let scriptInjectIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
-    // operations.push({
-    //     index: scriptInjectIndex,
-    //     operation: 'insert',
-    //     value: injects.dom + injects.ws
-    // });
+    const reg = {
+        header: /(?<=\<head.*\>)\s*(?=\<)/,
+        scriptStart: /\<script/,
+        // Unexpected behavior on ` 'xxx'>xxx<script> ` doesn't match the first `>`. case specific, small hit rate, performance trade off not worth it
+        // <0.1 ms/10 match in 200 char - 1300±100 steps  
+        scriptAttr: /(?<=\s)([^\s]+?)?(?:(?:\s*?=\s*?(?:'|").*?(?:'|\"))|(?:\s*?(>)))/g,
+        script: /(?<=\<script.*\>)\s*(?=\<)/
+    }
+    // script inject, regex time: 0.5 ms, esti tot time: 1 ms
+    let scriptInjectIndex
+    try {
+        scriptInjectIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
+    } catch (error) {
+        console.log(error)
+    }
+    operations.push({
+        index: scriptInjectIndex,
+        operation: 'insert',
+        value: injects.dom + injects.ws
+    });
 
-    // for (let index = 0; index != -1; index = htmlDocument.indexOf('<script', index)) { // finds the start of a script tag
-    //     reg.scriptAttr.lastIndex = index; // sets the regex to the start of the script tag
-    //     // the second match signals stop, inverting that and passing it to for's condition acts as: `!match[1]`
-    //     for (let match; !((match = reg.scriptAttr.exec(htmlDocument))[1]);) {
-    //         const attribute = match[0];
-    //         if (attribute == 'integrity') {
-    //             operations.push({
-    //                 startIndex: match.index,
-    //                 endIndex: match.index + attribute.length,
-    //                 operation: 'replace',
-    //                 value: '__CROS_integrity'
-    //             });
-    //         }
-    //     }
-    // }
-    // return htmlDocument;
+    for (let index = 0; (index = htmlDocument.indexOf('<script', index)) != -1;) { // finds the start of a script tag
+        reg.scriptAttr.lastIndex = index += 7; // sets the regex to the start of the script tag
+        let isExternalJS = false; // weather to parse the contenings of the script tag
+
+        // the second match signals stop, inverting that and passing it to for's condition acts as: `!match[1]`
+        for (let match; (match = reg.scriptAttr.exec(htmlDocument)) && !match[2];) {
+            index = match.index + match[0].length; // sets the index to the end of the match
+            const attribute = match[1];
+            if (attribute == 'src') {
+                isExternalJS = true;
+            } else if (attribute == 'integrity') {
+                operations.push({
+                    index: match.index,
+                    endIndex: match.index + attribute.length,
+                    operation: 'replace',
+                    value: '__CROS_integrity'
+                });
+            }
+        }
+    }
+    console.log(operations);
+    // actually operating on the document, this will fail if operations is not ordered from the start of the doc to end
+    let previous_endIndex = 0;
+    let result = '';
+    for (let i = 0; i < operations.length; i++) {
+        const operation = operations[i];
+        result += htmlDocument.slice(previous_endIndex, operation.index) + operation.value;
+        switch (operation.operation) {
+            case 'insert':
+                previous_endIndex = operation.index;
+                break;
+            case 'replace':
+                previous_endIndex = operation.endIndex - 1;
+                break;
+        }
+    }
+    result += htmlDocument.slice(previous_endIndex);
+    return result;
 }
 
 // performance: ~130ms pre call :(
@@ -384,7 +406,7 @@ async function requestHandler(event, clientID) {
         if (requestURL.pathname == localResource[i]) {
             if (i == 0) {
                 let res = await fetch(requestURL); 
-                return new Response('let __CROS_origin=`' + CURRENT_URL.href + '`;' + await res.text())
+                return new Response('let __CROS_origin=`' + CURRENT_URL.origin + '`;' + await res.text())
             }
             return await fetch(requestURL);
         }

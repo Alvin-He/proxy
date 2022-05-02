@@ -346,7 +346,7 @@ function upgradeListener(req, clientSocket, head) {
     if (req.url.substring(0, 4) == '/ws/') {
         try {
             const target = new URL(req.url.substring(4));
-            const origin = new URL(target.searchParams.get('__CROS_LCPP_WS_ORIGIN'));  
+            const origin = new URL(target.searchParams.get('__CROS_LCPP_WS_ORIGIN')).origin;  
             target.searchParams.delete('__CROS_LCPP_WS_ORIGIN')
             const port = target.port || target.protocol == 'wss:' ? 443 : 80;
             
@@ -357,6 +357,7 @@ function upgradeListener(req, clientSocket, head) {
                 // rejectUnauthorized: false,
                 servername: target.hostname,
             }, () => {
+                console.log('<-' + target.href);
                 //generate a websocket upgrade request since we already used it
                 proxySocket.write('GET ' + target.href + ' HTTP/1.1\r\n'); // let the server know we are upgrading
                 req.rawHeaders.forEach((value, index) => {
