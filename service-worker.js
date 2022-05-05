@@ -205,14 +205,14 @@ async function parseHTML(htmlDocument) {
     let scriptInjectIndex
     try {
         scriptInjectIndex = /(?<=\<head.*\>)\s*(?=\<)/.exec(htmlDocument).index
+        operations.push({
+            index: scriptInjectIndex,
+            operation: 'insert',
+            value: injects.dom + injects.ws
+        });
     } catch (error) {
         console.log(error)
     }
-    operations.push({
-        index: scriptInjectIndex,
-        operation: 'insert',
-        value: injects.dom + injects.ws
-    });
 
     for (let index = 0; (index = htmlDocument.indexOf('<script', index)) != -1;) { // finds the start of a script tag
         reg.scriptAttr.lastIndex = index += 7; // sets the regex to the start of the script tag
