@@ -7,6 +7,23 @@ const injects = {
     winLocation: 'win.location',
 }
 
+const old_createElement = document.createElement;
+Element.prototype.attribute
+document.createElement = function (tagName, options) {
+    let element = old_createElement.call(this, tagName, options);
+    element.__CROS_PROPERTIES = {
+        integrity: '',
+    };
+    if (element.integrity != undefined) { // integrity override
+        element.__defineSetter__('integrity', function (value) { return this.__CROS_PROPERTIES.integrity = value; });
+        element.__defineGetter__('integrity', function () { return this.__CROS_PROPERTIES.integrity; });
+    }
+
+    return element;
+}
+Document.prototype.createElement = document.createElement;
+// DOM Observer is used as a daynamic interceptor for all the links in the page
+// it's also used to modify some attributes that got somehow added bypassing html createlement (which normally don't work, but why not)
 
 function redirect(targetAttr, node, endpoint) {
     const protocol = node[targetAttr].substring(0, 7)
@@ -86,14 +103,3 @@ observer.observe(targetNode, config);
 console.log('DOM observer started');
 
 // Later, you can stop observing
-// observer.disconnect();
-
-// basicially &document in C++
-// const o_document = {ref: document}.ref;
-// const o_window_location = {ref: window.location}.ref;
-// const o_getElementById = {ref: o_document.getElementById}.ref;
-
-// document.getElementById = function(id) {
-//     console.log('ov called')
-//     return o_getElementById.bind(this)(id);
-// }
