@@ -1,3 +1,5 @@
 {
-    "liveServer.settings.multiRootWorkspaceName": "proxy"
+    "liveServer.settings.multiRootWorkspaceName": "proxy",
+    "editor.bracketPairColorization.enabled": false,
+    "editor.bracketPairColorization.independentColorPoolPerBracketType": false
 }
