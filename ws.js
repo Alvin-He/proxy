@@ -1,3 +1,4 @@
+// let __CROS_origin = SCOPE:serviceworker:CURRENT_URL.origin
 // WebSocket API overwrite 
 const sw = navigator.serviceWorker
 
@@ -82,79 +83,29 @@ console.log('WebSocket overwritten')
 
 
 
-// the client pings the sw when there's a change expected in the url
+// window.location override, should be in another file, but too lazy to do that right now
 
 let __CORS_SCRIPT_LOADED = []; // a list of scripts that's loaded'
 
-const __CORS_browsePreset = '/browse/';
-let __CORS_base
-sw.addEventListener('message', async (event) => {
-    if (event.data.type == 'LOCATION_BASE') {
-        __CORS_base = new URL(event.data.location);
+class __CROS_location extends URL { // base location class
+    constructor() {
+        super(__CROS_origin);
+        return this;
     }
-});
-async function update_base() {
-    sw.controller.postMessage({
-        type: 'LOCATION_BASE'
-    });
+    assign(url) {
+        window.location.assign(window.origin + '/sw-signal/navigate/' + url);
+    }
+    reload() {
+        window.location.reload(window.origin + '/sw-signal/navigate/' + this.href);
+    }
+    replace(url) {
+        window.location.replace(window.origin + '/sw-signal/navigate/' + url);
+    }
 }
-update_base();
-const __CORS_user_location = () => { return __CORS_base }
-let _location = {
-    get search() { return location.search; },
-    set search(value) { location.search = value; },
 
-    get hash() { return location.hash; },
-    set hash(value) { location.hash = value; },
-
-    get host() { return __CORS_user_location().host; },
-    set host(value) {
-        __CORS_user_location().host = value;
-        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
-    },
-
-    get hostname() { return __CORS_user_location().hostname; },
-    set hostname(value) {
-        __CORS_user_location().hostname = value;
-        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
-    },
-
-    get origin() { return __CORS_user_location().origin; },
-    set origin(value) {
-        __CORS_user_location().origin = value;
-        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
-    },
-
-    get href() { return __CORS_user_location().href; },
-    set href(value) {
-        __CORS_user_location().href = value;
-        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
-    },
-
-    get pathname() { return __CORS_user_location().pathname; },
-    set pathname(value) {
-        __CORS_user_location().pathname = value;
-        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
-    },
-
-    get port() { return __CORS_user_location().port; },
-    set port(value) {
-        __CORS_user_location().port = value;
-        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
-    },
-
-    get protocol() { return __CORS_user_location().protocol; },
-    set protocol(value) {
-        __CORS_user_location().protocol = value;
-        location.pathname = __CORS_browsePreset + __CORS_user_location().href;
-    },
-}
+const __CORS_location = new __CROS_location();
 let win = {
-    get location() { console.log('location acccess'); return _location; },
-    set location(value) { location.pathname = __CORS_browsePreset + new URL(value).href; },
-    __proto__: window,
+    get location() { return __CORS_location; },
+    set location(value) { __CROS_location.assign(value) },
 }
-win = window;
-const __CORS_location = win.location;
-globalThis = win;
 

@@ -260,7 +260,7 @@ async function parseHTML(htmlDocument) {
  * @param {String} code 
  * @returns 
  */
-let reg = /(?<=[\:\;\s\(\{\}\+\=])(window|document|this)?(?:\.?location)(?:[\,\;\.\s\)\}\+\=])/g
+let reg = /(?<=[\:\;\s\(\{\}\+\=])(window|document|this|globalThis)?(?:\.?location)(?:[\,\;\.\s\)\}\+\=])/g
 async function parseJS(code, url) {
     if (code.length < 1) return null;
     // code = 'try{__CORS_SCRIPT_LOADED.push(\'' + url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=\:])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocationAssign);

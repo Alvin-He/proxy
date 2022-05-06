@@ -1,4 +1,6 @@
 // JavaScript HTML DOM overwrite
+
+// global variables
 const CROS_SERVER_ENDPOINT = window.location.origin + '/'
 const injects = {
     ws: '<script src="/local/ws.js"></script>',
@@ -6,14 +8,14 @@ const injects = {
     redirEndPoint: CROS_SERVER_ENDPOINT + 'sw-signal/navigate/', //'sw-signal/anchor-navigate/',
     winLocation: 'win.location',
 }
+const old = { // references to origional functions
+    createElement:  document.createElement,
+}
 
-const old_createElement = document.createElement;
-Element.prototype.attribute
 document.createElement = function (tagName, options) {
-    let element = old_createElement.call(this, tagName, options);
-    element.__CROS_PROPERTIES = {
-        integrity: '',
-    };
+    let element = old.createElement.call(this, tagName, options);
+    element.__CROS_PROPERTIES = {}
+    element.__CROS_PROPERTIES.integrity = '';
     if (element.integrity != undefined) { // integrity override
         element.__defineSetter__('integrity', function (value) { return this.__CROS_PROPERTIES.integrity = value; });
         element.__defineGetter__('integrity', function () { return this.__CROS_PROPERTIES.integrity; });
@@ -22,6 +24,12 @@ document.createElement = function (tagName, options) {
     return element;
 }
 Document.prototype.createElement = document.createElement;
+
+
+
+
+
+
 // DOM Observer is used as a daynamic interceptor for all the links in the page
 // it's also used to modify some attributes that got somehow added bypassing html createlement (which normally don't work, but why not)
 
