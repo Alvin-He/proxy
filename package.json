@@ -1,7 +1,7 @@
 {
-    "name": "corsidium-glitch-testing",
+    "name": "corsidium",
     "version": "0.4.4",
-    "description": "corsidium glitch testing server",
+    "description": "corsidium proxy server",
     "main": "./corsidium.js",
     "files": [
       "lib/",
@@ -13,7 +13,7 @@
     },
     "scripts": {
       "lint": "eslint .",
-      "start": "node corsidium.js",
+      "start": "node ./corsidium.js",
       "debug": "node ./test/server.test.js",
       "test": "node corsidium.js"
     },
