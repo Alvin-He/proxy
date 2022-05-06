@@ -16,7 +16,7 @@
       "start": "node corsidium.js",
       "debug": "node ./test/server.test.js",
       "test": "node corsidium.js"
-    },
+    }, 
     "engines": {
       "node": "16.0.0"
     }
