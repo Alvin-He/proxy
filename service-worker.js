@@ -349,7 +349,7 @@ async function signalHandler(request, reqUrl, clientID) {
 async function fetchRespond(request, clientID, fetchDes, fetchInit = undefined) {
     
     const response = await fetch(fetchDes, fetchInit); 
-    if (response.status == 0) return response;
+    if (!response.ok || response.status == 0 ) return response;
 
     if (request.mode == 'navigate') {
         const url = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');

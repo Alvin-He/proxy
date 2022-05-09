@@ -87,9 +87,9 @@ console.log('WebSocket overwritten')
 
 let __CORS_SCRIPT_LOADED = []; // a list of scripts that's loaded'
 
-class __CROS_location extends URL { // base location class
+class __CORS_location_base extends URL { // base location class
     constructor() {
-        super(__CROS_origin);
+        super(__CROS_origin + window.location.pathname + window.location.search + window.location.hash);
         return this;
     }
     assign(url) {
@@ -103,9 +103,9 @@ class __CROS_location extends URL { // base location class
     }
 }
 
-const __CORS_location = new __CROS_location();
+const __CORS_location = new __CORS_location_base();
 let win = {
     get location() { return __CORS_location; },
-    set location(value) { __CROS_location.assign(value) },
+    set location(value) { __CORS_location.assign(value) },
 }
 
