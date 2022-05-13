@@ -24,6 +24,23 @@ log.toString = () => {
     });
 }
 
+let dat_frames = indexedDB.open('dat', 1); 
+await (new Promise((resolve, reject) => {
+    dat_frames.onsuccess((event) => {
+        resolve();
+    });
+    dat_frames.onerror(() => {
+        dat_frames.onerror = undefined;
+        throw 'IndexDB Access Error'
+        reject();
+    })
+}))();
+let dat_connection = dat_frames.result
+let dat_transaction = dat_connection.transaction('frames', 'readwrite')
+let trans_objStore = dat_transaction.objectStore
+trans_objStore
+
+
 // requests are handled specific to a frame(html page) so we can have muti tab support and iframes
 let frames = {
     client: {
