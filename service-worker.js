@@ -24,23 +24,36 @@ log.toString = () => {
     });
 }
 
+async function idb_promise(req) {
+    return await (new Promise((resolve, reject) => {
+        req.onsuccess((event) => {
+            req.onsuccess = undefined;
+            resolve();
+        });
+        req.onerror(() => {
+            req.onerror = undefined;
+            throw 'IndexDB Access Error'
+            reject();
+        })
+    }))();
+}
+
 let dat_frames = indexedDB.open('dat', 1); 
-await (new Promise((resolve, reject) => {
-    dat_frames.onsuccess((event) => {
-        resolve();
-    });
-    dat_frames.onerror(() => {
-        dat_frames.onerror = undefined;
-        throw 'IndexDB Access Error'
-        reject();
-    })
-}))();
-let dat_connection = dat_frames.result
-let dat_transaction = dat_connection.transaction('frames', 'readwrite')
-let trans_objStore = dat_transaction.objectStore
+await idb_promise(dat_frames)
+let dat_connection = dat_frames.result;
+let dat_transaction = dat_connection.transaction('frames', 'readwrite');
+let trans_objStore = dat_transaction.objectStore('frames');
+
+function get(url) {
+    let targetData = trans_objStore.get(url);
+    await idb_promise(targetData); 
+    
+}
+let frames_obj = trans_objStore.get('frames');
+await idb_promise(frames_obj);
+// frames_obj = frames_obj.result;
+
 trans_objStore
-
-
 // requests are handled specific to a frame(html page) so we can have muti tab support and iframes
 let frames = {
     client: {
