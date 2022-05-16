@@ -27,6 +27,11 @@ navigator.serviceWorker.addEventListener('message', (event) => {
                 // serviceWorkerFetchs[event.data.url](event.data.response, event.data.status)
                 serviceWorkerFetchs[event.data.originUrl](event.data.status, event.data.resultUrl)
             }
+        }else if (event.data.type == 'REPORT_ORIGIN') {
+            sw.controller.postMessage({
+                type: 'REPORT_ORIGIN',
+                origin: ''
+            });
         }
     }
 });

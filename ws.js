@@ -109,3 +109,14 @@ let win = {
     set location(value) { __CORS_location.assign(value) },
 }
 
+
+// service worker callbacks
+sw.onmessage = (event) => {
+    let data = event.data;
+    if (data.type == 'REPORT_ORIGIN') {
+        sw.controller.postMessage({
+            type: 'REPORT_ORIGIN',
+            origin: __CROS_origin
+        });
+    }
+}

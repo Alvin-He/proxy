@@ -24,36 +24,6 @@ log.toString = () => {
     });
 }
 
-async function idb_promise(req) {
-    return await (new Promise((resolve, reject) => {
-        req.onsuccess((event) => {
-            req.onsuccess = undefined;
-            resolve();
-        });
-        req.onerror(() => {
-            req.onerror = undefined;
-            throw 'IndexDB Access Error'
-            reject();
-        })
-    }))();
-}
-
-let dat_frames = indexedDB.open('dat', 1); 
-await idb_promise(dat_frames)
-let dat_connection = dat_frames.result;
-let dat_transaction = dat_connection.transaction('frames', 'readwrite');
-let trans_objStore = dat_transaction.objectStore('frames');
-
-function get(url) {
-    let targetData = trans_objStore.get(url);
-    await idb_promise(targetData); 
-    
-}
-let frames_obj = trans_objStore.get('frames');
-await idb_promise(frames_obj);
-// frames_obj = frames_obj.result;
-
-trans_objStore
 // requests are handled specific to a frame(html page) so we can have muti tab support and iframes
 let frames = {
     client: {
@@ -120,9 +90,16 @@ self.addEventListener("message", async function (event){
                 // response : response
             })
             
-        }else if (event.data.type == 'NEW_NAVIGATION'){
-            frames[client.id] = {
-                CURRENT_URL: new URL(event.data.url),
+        }else if (event.data.type == 'REPORT_ORIGIN'){
+            try {
+                frames[client.id] = frames[client.id] || {};
+                frames[client.id].CURRENT_URL = new URL(event.data.origin);
+                if (frames[client.id].callback) {
+                    frames[client.id].callback(event.data.origin);
+                    delete frames[client.id].callback;
+                }
+            } catch (error) {
+                console.error(error);
             }
         }else if (event.data.type == 'LOCATION_BASE'){
             client.postMessage({
@@ -149,6 +126,21 @@ self.addEventListener("message", async function (event){
     }
      
 })
+
+async function requestClientOrigin (clientID) {
+    const client = await self.clients.get(clientID);
+    if (client) {
+        frames[clientID] = frames[clientID] || {};
+        return await new Promise((resolve, reject) => {
+            frames[clientID].callback = resolve;
+            client.postMessage({
+                type: 'REQUEST_ORIGIN'
+            });
+        })
+    }else {
+        return null;
+    }
+} 
 
 self.addEventListener('fetch', function (event) {
     event.respondWith(requestHandler(event, event.clientId || event.resultingClientId));
@@ -413,7 +405,7 @@ async function fetchRespond(request, clientID, fetchDes, fetchInit = undefined) 
 // request handler
 /**
  * 
- * @param {Request} request 
+ * @param {FetchEvent} event 
  * @returns 
  */
 async function requestHandler(event, clientID) {
@@ -424,26 +416,36 @@ async function requestHandler(event, clientID) {
 
     let requestURL = new URL(request.url); 
     let CURRENT_URL = frames[clientID] ? frames[clientID].CURRENT_URL : null;
-    if (requestURL.pathname.startsWith('/sw-signal/')) {
-        return signalHandler(request, requestURL.pathname, clientID);
-    } else if (!CURRENT_URL) {
-        console.warn('N_CURRENT_URL req:' + requestURL.href);
-        return await fetch(requestURL);
-    } else if (REGEXP_REDIR.test(request.url)) {
-        return await fetchRespond(request, clientID , request)
-    } 
     for (let i = 0; i < localResource.length; i++) {
         if (requestURL.pathname == localResource[i]) {
             if (i == 0) {
-                let res = await fetch(requestURL); 
+                let res = await fetch(requestURL);
                 return new Response('let __CROS_origin=`' + CURRENT_URL.origin + '`;' + await res.text())
             }
             return await fetch(requestURL);
         }
     }
-    const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
+    if (requestURL.pathname.startsWith('/sw-signal/')) {
+        return signalHandler(request, requestURL.pathname, clientID);
+    }else if (REGEXP_REDIR.test(request.url)) {
+        return await fetchRespond(request, clientID , request)
+    } else if (CURRENT_URL) {
+        if (CURRENT_URL.origin == CROS_SERVER_ENDPOINT.origin) return await fetch(requestURL);
+        const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
 
-    return url.match(/https?:\/\//g).length > 2
-        ? await fetchRespond(request, clientID, request.url, await reqInit(request))
-        : await fetchRespond(request, clientID, CROS_SERVER_ENDPOINT + url, await reqInit(request));
+        return url.match(/https?:\/\//g).length > 2
+            ? await fetchRespond(request, clientID, request.url, await reqInit(request))
+            : await fetchRespond(request, clientID, CROS_SERVER_ENDPOINT + url, await reqInit(request));
+    } 
+    // if no CURRENT_URL
+    console.warn('N_CURRENT_URL req:' + requestURL.href);
+    if (request.mode != 'navigate' && await requestClientOrigin(clientID)){
+        console.log('rh again')
+        return await requestHandler(event, clientID); 
+    } 
+    else {
+        console.log('dir fetch')
+        return await fetch(requestURL);
+    }
+
 }
