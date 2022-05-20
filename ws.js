@@ -81,7 +81,7 @@ console.log('WebSocket overwritten')
 
 
 
-
+// const __CROS_origin = new URL(location.pathname.slice(1));
 
 // window.location override, should be in another file, but too lazy to do that right now
 
@@ -89,17 +89,21 @@ let __CORS_SCRIPT_LOADED = []; // a list of scripts that's loaded'
 
 class __CORS_location_base extends URL { // base location class
     constructor() {
-        super(__CROS_origin + window.location.pathname + window.location.search + window.location.hash);
+        // super(__CROS_origin + window.location.pathname + window.location.search + window.location.hash);
+        super(window.location.pathname.slice(1) + window.location.search + window.location.hash);
         return this;
     }
     assign(url) {
-        window.location.assign(window.origin + '/sw-signal/navigate/' + url);
+        // window.location.assign(window.origin + '/sw-signal/navigate/' + url);
+        window.location.assign(window.origin + url);
     }
     reload() {
-        window.location.reload(window.origin + '/sw-signal/navigate/' + this.href);
+        // window.location.reload(window.origin + '/sw-signal/navigate/' + this.href);
+        window.location.reload();
     }
     replace(url) {
-        window.location.replace(window.origin + '/sw-signal/navigate/' + url);
+        // window.location.replace(window.origin + '/sw-signal/navigate/' + url);
+        window.location.replace(window.origin + url);
     }
 }
 

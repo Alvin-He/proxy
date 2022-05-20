@@ -293,21 +293,22 @@ async function signalHandler(request, reqUrl, clientID) {
  * @param {*} fetchInit 
  * @returns 
  */
-async function fetchRespond(request, clientID, fetchDes, fetchInit = undefined) {
+// async function fetchRespond(request, clientID, fetchDes, fetchInit = undefined) {
+async function fetchRespond(request, fetchDes, fetchInit = undefined) {
     
     const response = await fetch(fetchDes, fetchInit); 
     if (!response.ok || response.status == 0 ) return response;
 
-    if (request.mode == 'navigate') {
-        const url = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
-        try {
-            if (frames[clientID]) frames[clientID].CURRENT_URL = new URL(url);
-            else frames[clientID] = { CURRENT_URL: new URL(url) };
-        } catch (e) {
-            console.log('C_URL_ERR')
-        }
+    // if (request.mode == 'navigate') {
+    //     const url = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
+    //     try {
+    //         if (frames[clientID]) frames[clientID].CURRENT_URL = new URL(url);
+    //         else frames[clientID] = { CURRENT_URL: new URL(url) };
+    //     } catch (e) {
+    //         console.log('C_URL_ERR')
+    //     }
 
-    }
+    // }
     const contentType = response.headers.get('content-type');
     if (contentType && typeof contentType == 'string') {
         if (contentType.includes('/javascript')) {
@@ -337,23 +338,26 @@ async function requestHandler(request, clientID) {
     // console.log(clientID, frames[clientID] ? frames[clientID] : 'frame with id: ' + clientID + ' not found');
 
     let requestURL = new URL(request.url); 
-    try {
 
-        if (request.destination = 'navigate') {
-            let targetURL = new URL(requestURL.pathname.slice(1));
-
-        }else{
-            const clientURL = (await self.clients.get(clientID)).url;
-
-            
-
-        }
-    }catch(error) {
-        for (let i = 0; i < localResource.length; i++) {
-            if (requestURL.pathname == localResource[i]) {
-                return await fetch(requestURL);
-            }
+    for (let i = 0; i < localResource.length; i++) {
+        if (requestURL.pathname == localResource[i]) {
+            return await fetch(requestURL);
         }
     }
 
+    if (request.destination == 'navigate') {
+        let targetURL = new URL(requestURL.pathname.slice(1));
+        return await fetchRespond(request, targetURL, await reqInit(request));
+    }else{
+
+        // CROS requests
+        if (requestURL.origin != CROS_SERVER_ENDPOINT.origin) {
+            return await fetchRespond(request, requestURL, await reqInit(request));
+        }
+        // direct requests to home server
+        const clientURL = (await self.clients.get(clientID)).url;
+        const target = new URL(requestURL.pathname, clientURL);
+        return await fetchRespond(request, target, await reqInit(request));
+
+    }
 }
