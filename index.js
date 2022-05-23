@@ -49,7 +49,7 @@ function doCORSRequest() {
             //     url : url
             // })
             // window.location.href = 'https://' + window.location.host + '/sw-signal/navigate/' + resultUrl;
-            window.location.href = 'https://' + window.location.host + resultUrl;
+            window.location.href = 'https://' + window.location.host + '/' + resultUrl;
             // let newWindow = window.open('https://127.0.0.1:3000')
             // newWindow.document.write(response)
             // newWindow.document.scripts.

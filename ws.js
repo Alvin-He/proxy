@@ -1,6 +1,7 @@
 // let __CROS_origin = SCOPE:serviceworker:CURRENT_URL.origin
 // WebSocket API overwrite 
 const sw = navigator.serviceWorker
+const CROS_SERVER_ENDPOINT = new URL(window.location.origin);
 
 const ref_ws = {WebSocket}.WebSocket;
 class ws extends EventTarget {
@@ -33,8 +34,8 @@ class ws extends EventTarget {
         super() // EventTarget initialization
         this.__CROS_target_url = url;
         let tURL = new URL(url);
-        tURL.searchParams.append('__CROS_LCPP_WS_ORIGIN', __CROS_origin)
-        this.__CROS_ws_sock = new ref_ws('wss://' + window.location.host + '/ws/' + tURL.href, protocols);
+        tURL.searchParams.append('__CROS_LCPP_WS_ORIGIN', new URL(window.location.pathname.slice(1)).origin);
+        this.__CROS_ws_sock = new ref_ws('wss://' + CROS_SERVER_ENDPOINT.host + '/ws/' + tURL.href, protocols);
         // list of listener variables
         this.__CROS_ws_internal_listeners = {
             onclose: null,
@@ -94,16 +95,18 @@ class __CORS_location_base extends URL { // base location class
         return this;
     }
     assign(url) {
+        console.log('assign', url);
         // window.location.assign(window.origin + '/sw-signal/navigate/' + url);
-        window.location.assign(window.origin + url);
+        window.location.assign(CROS_SERVER_ENDPOINT.origin + new URL(url, this.origin));
     }
     reload() {
         // window.location.reload(window.origin + '/sw-signal/navigate/' + this.href);
         window.location.reload();
     }
     replace(url) {
+        console.log('replace', url);
         // window.location.replace(window.origin + '/sw-signal/navigate/' + url);
-        window.location.replace(window.origin + url);
+        window.location.replace(CROS_SERVER_ENDPOINT.origin + new URL(url, this.origin));
     }
 }
 

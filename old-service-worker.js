@@ -1,15 +1,28 @@
 
-/**
- * 
- * /<http|https>://<URL> base browsing directory
- * 
- * 
- */
+
 
 
 const CROS_SERVER_ENDPOINT = new URL(new URL (serviceWorker.scriptURL).origin)
 const clientUUID = 'undefined!undefined!undefined!undefined!'; 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+let currentID = 0;
+// Information about websockets, NOTE: this contains every single websocket that the service worker controls
+let webSockets = {
+    0: null, // 0 is the default websocket(null);
+};
+
+let log = [];
+let print = (...args) => {
+    args.forEach(arg => {
+        log.push(arg);
+    });
+}
+log.toString = () => {
+    log.forEach(arg => {
+        console.log(arg);
+    });
+}
 
 // requests are handled specific to a frame(html page) so we can have muti tab support and iframes
 let frames = {
@@ -88,14 +101,85 @@ self.addEventListener("message", async function (event){
             } catch (error) {
                 console.error(error);
             }
-        }
+        }else if (event.data.type == 'LOCATION_BASE'){
+            client.postMessage({
+                type: 'LOCATION_BASE',
+                location: frames[client.id] ? frames[client.id].CURRENT_URL.href : CROS_SERVER_ENDPOINT.href
+            })
+        }else if (event.data.type == 'LCPP_NOTIFY'){
+            const {host, origin, href} = new URL(event.data.url);
+            const identifier = await generateIdentifier(host, origin);
+            if (await notifyServer(identifier, frames[client.id].CURRENT_URL ,event.data.url)) {
+                client.postMessage({
+                    type: 'LCPP_NOTIFY',
+                    status: 'ok',
+                    url: event.data.url
+                })
+            }else{
+                client.postMessage({
+                    type: 'LCPP_NOTIFY',
+                    status: 'failed',
+                    url: event.data.url
+                })
+            }
+        };
     }
      
 })
 
+async function requestClientOrigin (clientID) {
+    const client = await self.clients.get(clientID);
+    if (client) {
+        frames[clientID] = frames[clientID] || {};
+        return await new Promise((resolve, reject) => {
+            frames[clientID].callback = resolve;
+            client.postMessage({
+                type: 'REQUEST_ORIGIN'
+            });
+        })
+    }else {
+        return null;
+    }
+} 
+
 self.addEventListener('fetch', function (event) {
     event.respondWith(requestHandler(event, event.clientId || event.resultingClientId));
 });
+
+// generates an identifier in the form of LCPP-[host + origin hex hash]-[unix time stamp]-[client UUID]-CROS
+async function generateIdentifier(host, origin) {
+    // conbine host and origin into a single byte array, so we can hash them 
+    const data = new TextEncoder().encode(host + origin); 
+    // the hash in SHA-1 (you could use SHA-256, but it's just a UUID, so no need to make it too secure)
+    const hash = await crypto.subtle.digest('SHA-1', data) 
+    const hashArray = Array.from(new Uint8Array(hash)); // converts into Uint8Array 
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join(''); // converts to hex 
+
+    return 'LCPP-' + hashHex + '-' + Number(new Date) + '-' + clientUUID + '-CROS'
+}
+
+// ya, we're definely gonna switch to socket io afterwards .......
+async function notifyServer(identifier, origin, target) {
+    const req = new Request(CROS_SERVER_ENDPOINT.origin + '/LCPP', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+            identifier: identifier,
+            origin: origin,
+            target: target
+        })
+    })
+
+    let res = await fetch(req);
+    if (res.status == 201) { // if the server accepted the request
+        return true;
+    }else{ // if the server rejected the request, signal error to the client
+        throw 'internal service worker error'
+    }
+
+}
 
 // prefetch the document
 async function prefetchDocument(target) {
@@ -111,15 +195,6 @@ async function prefetchDocument(target) {
     }
     return url
 }
-
-// convert ./<http|https>://<URI>
-// to a normal url: <proto>://<URI>
-function get_target_URL(url) {
-    let original = new URL(url);
-    let target = new URL(original.pathname.slice(1));
-    return target;
-}
-
 
 /**
  * Current preformance is: 4.5 ms per call when parsing https://discord.com
@@ -293,22 +368,21 @@ async function signalHandler(request, reqUrl, clientID) {
  * @param {*} fetchInit 
  * @returns 
  */
-// async function fetchRespond(request, clientID, fetchDes, fetchInit = undefined) {
-async function fetchRespond(request, fetchDes, fetchInit = undefined) {
+async function fetchRespond(request, clientID, fetchDes, fetchInit = undefined) {
     
     const response = await fetch(fetchDes, fetchInit); 
     if (!response.ok || response.status == 0 ) return response;
 
-    // if (request.mode == 'navigate') {
-    //     const url = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
-    //     try {
-    //         if (frames[clientID]) frames[clientID].CURRENT_URL = new URL(url);
-    //         else frames[clientID] = { CURRENT_URL: new URL(url) };
-    //     } catch (e) {
-    //         console.log('C_URL_ERR')
-    //     }
+    if (request.mode == 'navigate') {
+        const url = response.url.replace(REGEXP_CROS_SERVER_ENDPOINT, '');
+        try {
+            if (frames[clientID]) frames[clientID].CURRENT_URL = new URL(url);
+            else frames[clientID] = { CURRENT_URL: new URL(url) };
+        } catch (e) {
+            console.log('C_URL_ERR')
+        }
 
-    // }
+    }
     const contentType = response.headers.get('content-type');
     if (contentType && typeof contentType == 'string') {
         if (contentType.includes('/javascript')) {
@@ -331,33 +405,47 @@ async function fetchRespond(request, fetchDes, fetchInit = undefined) {
 // request handler
 /**
  * 
- * @param {Request} request 
+ * @param {FetchEvent} event 
  * @returns 
  */
-async function requestHandler(request, clientID) {
+async function requestHandler(event, clientID) {
     // console.log(clientID, frames[clientID] ? frames[clientID] : 'frame with id: ' + clientID + ' not found');
 
-    let requestURL = new URL(request.url); 
 
+    const request = event.request;
+
+    let requestURL = new URL(request.url); 
+    let CURRENT_URL = frames[clientID] ? frames[clientID].CURRENT_URL : null;
     for (let i = 0; i < localResource.length; i++) {
         if (requestURL.pathname == localResource[i]) {
+            if (i == 0) {
+                let res = await fetch(requestURL);
+                return new Response('let __CROS_origin=`' + CURRENT_URL.origin + '`;' + await res.text())
+            }
             return await fetch(requestURL);
         }
     }
+    if (requestURL.pathname.startsWith('/sw-signal/')) {
+        return signalHandler(request, requestURL.pathname, clientID);
+    }else if (REGEXP_REDIR.test(request.url)) {
+        return await fetchRespond(request, clientID , request)
+    } else if (CURRENT_URL) {
+        if (CURRENT_URL.origin == CROS_SERVER_ENDPOINT.origin) return await fetch(requestURL);
+        const url = request.url.replace(REGEXP_CROS_SERVER_ENDPOINT, CURRENT_URL.origin + '/')
 
-    if (request.destination == 'navigate') {
-        let targetURL = new URL(requestURL.pathname.slice(1));
-        return await fetchRespond(request, targetURL, await reqInit(request));
-    }else{
-
-        // CROS requests
-        if (requestURL.origin != CROS_SERVER_ENDPOINT.origin) {
-            return await fetchRespond(request, requestURL, await reqInit(request));
-        }
-        // direct requests to home server
-        const clientURL = (await self.clients.get(clientID)).url;
-        const target = new URL(requestURL.pathname, clientURL);
-        return await fetchRespond(request, target, await reqInit(request));
-
+        return url.match(/https?:\/\//g).length > 2
+            ? await fetchRespond(request, clientID, request.url, await reqInit(request))
+            : await fetchRespond(request, clientID, CROS_SERVER_ENDPOINT + url, await reqInit(request));
+    } 
+    // if no CURRENT_URL
+    console.warn('N_CURRENT_URL req:' + requestURL.href);
+    if (request.mode != 'navigate' && await requestClientOrigin(clientID)){
+        console.log('rh again')
+        return await requestHandler(event, clientID); 
+    } 
+    else {
+        console.log('dir fetch')
+        return await fetch(requestURL);
     }
+
 }

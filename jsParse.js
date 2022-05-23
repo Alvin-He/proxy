@@ -15,6 +15,49 @@ const injects = {
 }
 
 
+// we are ignoring computed member access since it's litertly impossible to track
+async function parseJS(code, url) {
+    if (code.length < 1) return null;
+
+
+    let replaceIndex = []; // {type: 1 | 0, index:m.index} 
+    for (let match; match = reg.exec(code);) {
+        const sindex = match.index;
+        const eindex = sindex + match[0].length;
+
+        let i = 1;
+        while (/\s/.test(code[eindex + i])) i++ // repeat out whitespace chars 
+        while (code[eindex + i] == ')') i++; // repeat out right parens
+        while (/\s/.test(code[eindex + i])) i++ // space again 
+        console.log(eindex + i + 1);
+        if (code[eindex + i + 1] == '=') {
+            replaceIndex.push({
+                type: 1,
+                sIndex: sindex,
+                eIndex: eindex
+            });
+            continue;
+        }
+        replaceIndex.push({
+            type: 0,
+            sIndex: sindex,
+            eIndex: eindex
+        });
+    }
+    let returnVAL = 'try{__CORS_SCRIPT_LOADED.push(\'' + url + '\')}catch(e){};'
+    let previous_eIndex = 0;
+    for (let i = 0; i < replaceIndex.length; i++) {
+        if (replaceIndex[i].type == 0) {
+            returnVAL += code.slice(previous_eIndex, replaceIndex[i].sIndex) + injects.winLocationNonAssign
+        } else {
+            returnVAL += code.slice(previous_eIndex, replaceIndex[i].sIndex) + injects.winLocationAssign
+        }
+        previous_eIndex = replaceIndex[i].eIndex - 1;
+    }
+    returnVAL += code.slice(previous_eIndex);
+    return returnVAL;
+}
+
 function parser(code, startPos, endPos) {
     let length = endPos - startPos;
     if (endPos - startPos < 10) return null; // do nothing if we get the last bit of the code (shouldn't happen, but just in case) 

@@ -1,11 +1,11 @@
 // JavaScript HTML DOM overwrite
 
 // global variables
-const CROS_SERVER_ENDPOINT = window.location.origin + '/'
+const here_is_another_CROS_SERVER_ENDPOINT_idk_why = window.location.origin + '/'
 const injects = {
-    ws: '<script src="/local/ws.js"></script>',
-    dom: '<script src="/local/DOM.js"></script>',
-    redirEndPoint: CROS_SERVER_ENDPOINT + 'sw-signal/navigate/', //'sw-signal/anchor-navigate/',
+    ws: '<script src="/ws.js"></script>',
+    dom: '<script src="/DOM.js"></script>',
+    redirEndPoint: here_is_another_CROS_SERVER_ENDPOINT_idk_why,//'sw-signal/navigate/', //'sw-signal/anchor-navigate/',
     winLocation: 'win.location',
 }
 const old = { // references to origional functions
@@ -69,11 +69,11 @@ const callback = function (mutationsList, observer) {
             const targetAttr = mutation.attributeName; 
             const node = mutation.target;
             const nodeName = node.nodeName;
-            if (!node[targetAttr].startsWith(CROS_SERVER_ENDPOINT)) {
+            if (!node[targetAttr].startsWith(here_is_another_CROS_SERVER_ENDPOINT_idk_why)) {
                 if (nodeName == 'A' || nodeName == 'IFRAME') {
                     redirect(targetAttr, node, injects.redirEndPoint);
                 } else {
-                    redirect(targetAttr, node, CROS_SERVER_ENDPOINT);
+                    redirect(targetAttr, node, here_is_another_CROS_SERVER_ENDPOINT_idk_why);
                 }
             }
         }else if (mutation.type === 'childList') {
@@ -90,11 +90,11 @@ const callback = function (mutationsList, observer) {
                     || null
                 if (targetAttr) {
                     if (node['integrity']) node.removeAttribute('integrity');
-                    if (!node[targetAttr].startsWith(CROS_SERVER_ENDPOINT)) {
+                    if (!node[targetAttr].startsWith(here_is_another_CROS_SERVER_ENDPOINT_idk_why)) {
                         if (nodeName == 'A' || nodeName == 'IFRAME') {
                             redirect(targetAttr, node, injects.redirEndPoint);
                         } else {
-                            redirect(targetAttr, node, CROS_SERVER_ENDPOINT);
+                            redirect(targetAttr, node, here_is_another_CROS_SERVER_ENDPOINT_idk_why);
                         }
                     } 
                 }
