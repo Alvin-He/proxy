@@ -111,6 +111,8 @@ class __CORS_location_base extends URL { // base location class
 }
 
 const __CORS_location = new __CORS_location_base();
+// const __CORS_location = location;
+// let win = window;
 let win = {
     get location() { return __CORS_location; },
     set location(value) { __CORS_location.assign(value) },

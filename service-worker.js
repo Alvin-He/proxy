@@ -208,48 +208,51 @@ async function parseHTML(htmlDocument) {
  * @param {String} code 
  * @returns 
  */
-let reg = /(?<=[\:\;\s\(\)\{\}\+\=])(window|document|this|globalThis)?(?:\.?location)(?:[\,\;\.\s\)\}\+\=])/g
+let reg = /(?<=[\:\;\s\(\)\{\}\[\+\=\|\&\>\<\?\!])(?:(window|document|this|globalThis)\.)?(?:location)(?:[\,\;\.\s\)\}\]\+\<\>\|\&\?\=])/g
+
+// we are ignoring computed member access since it's litertly impossible to track
+// ignoring short hand if (condition ? true : false) because breaks way too many things 
 async function parseJS(code, url) {
     if (code.length < 1) return null;
-    // code = 'try{__CORS_SCRIPT_LOADED.push(\'' + url + '\')}catch(e){};' + code.replace(/(?<=[;\s\(\{\}\+\=\:])((window|document|this)\.)?location(?=[;\.\s\)\}\+\=])/g, injects.winLocationAssign);
+
+
     let replaceIndex = []; // {type: 1 | 0, index:m.index} 
     for (let match; match = reg.exec(code);) {
-        const index = match.index;
-        if (!match[1]) {
-            let i = 1;
-            while (/\s/.test(code[index - i])) i++ // repeat until we find a non-whitespace character
-            while (code[index - i] == '(') i++; // repeat until we're out of left brakets
-            if (code[index - i] == '{') { // if we hit a brace, then they are using {name:{location}}
-                while (/\s/.test(code[index - i])) i++ // non whitespace again
-                if (code[index - (i + 1)] == ':') {
-                    replaceIndex.push({
-                        type: 1, // 1 means that we'll have to replace it with location:win.location
-                        sIndex: match.index,
-                        eIndex: match.index + match[0].length
-                    });
-                    continue
-                }
-            }
+        const sindex = match.index;
+        const eindex = sindex + match[0].length;
+
+        let i = -1;
+        while (/\s/.test(code[eindex + i])) i++ // repeat out whitespace chars 
+        while (code[eindex + i] == ')') i++; // repeat out right parens
+        while (/\s/.test(code[eindex + i])) i++ // space again 
+        if (code[eindex + i] == '=') {
+            replaceIndex.push({
+                type: 1,
+                sIndex: sindex,
+                eIndex: eindex
+            });
+            continue;
         }
         replaceIndex.push({
-            type: 0, // 0 means normal op
-            sIndex: match.index,
-            eIndex: match.index + match[0].length
+            type: 0,
+            sIndex: sindex,
+            eIndex: eindex
         });
     }
     let returnVAL = 'try{__CORS_SCRIPT_LOADED.push(\'' + url + '\')}catch(e){};'
     let previous_eIndex = 0;
     for (let i = 0; i < replaceIndex.length; i++) {
         if (replaceIndex[i].type == 0) {
-            returnVAL += code.slice(previous_eIndex, replaceIndex[i].sIndex) + injects.winLocationAssign
-        } else {
             returnVAL += code.slice(previous_eIndex, replaceIndex[i].sIndex) + injects.winLocationNonAssign
+        } else {
+            returnVAL += code.slice(previous_eIndex, replaceIndex[i].sIndex) + injects.winLocationAssign
         }
         previous_eIndex = replaceIndex[i].eIndex - 1;
     }
     returnVAL += code.slice(previous_eIndex);
     return returnVAL;
 }
+
 
 // loads the old request data to a new one
 async function reqInit(request) {

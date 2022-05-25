@@ -14,6 +14,7 @@ const injects = {
     winLocation: 'win.location',
 }
 
+let reg = /(?<=[\:\;\s\(\)\{\}\[\+\=\|\&\>\<\?\!])(window|document|this|globalThis)?(?:\.?location)(?:[\:\,\;\.\s\)\}\]\+\<\>\|\&\?\=])/g
 
 // we are ignoring computed member access since it's litertly impossible to track
 async function parseJS(code, url) {
@@ -22,15 +23,16 @@ async function parseJS(code, url) {
 
     let replaceIndex = []; // {type: 1 | 0, index:m.index} 
     for (let match; match = reg.exec(code);) {
+        console.log(match);
         const sindex = match.index;
         const eindex = sindex + match[0].length;
 
-        let i = 1;
+        let i = -1;
         while (/\s/.test(code[eindex + i])) i++ // repeat out whitespace chars 
         while (code[eindex + i] == ')') i++; // repeat out right parens
         while (/\s/.test(code[eindex + i])) i++ // space again 
-        console.log(eindex + i + 1);
-        if (code[eindex + i + 1] == '=') {
+        console.log(eindex + i);
+        if (code[eindex + i] == '=') {
             replaceIndex.push({
                 type: 1,
                 sIndex: sindex,
