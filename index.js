@@ -25,7 +25,7 @@ navigator.serviceWorker.addEventListener('message', (event) => {
             if (serviceWorkerFetchs[event.data.originUrl] 
                 && typeof serviceWorkerFetchs[event.data.originUrl] == 'function') {
                 // serviceWorkerFetchs[event.data.url](event.data.response, event.data.status)
-                serviceWorkerFetchs[event.data.originUrl](event.data.status, event.data.resultUrl)
+                serviceWorkerFetchs[event.data.originUrl](event.data.status, event.data.resultUrl, event.data.data)
             }
         }else if (event.data.type == 'REPORT_ORIGIN') {
             sw.controller.postMessage({
@@ -36,10 +36,13 @@ navigator.serviceWorker.addEventListener('message', (event) => {
     }
 });
 
+const nav = document.getElementById('nav');
+const browser = document.getElementById('browser');
+
 function doCORSRequest() {
     let url = document.getElementById('Url').value; 
     //create callback          response, 
-    serviceWorkerFetchs[url] = (status, resultUrl) => {
+    serviceWorkerFetchs[url] = (status, resultUrl, data) => {
         console.log("GET" + ' ' + url + ' ' + status + ' result ' + resultUrl);
         // window.document.getElementsByTagName('html')[0].innerHTML = "";
         if (status == 'ok') {
@@ -49,7 +52,12 @@ function doCORSRequest() {
             //     url : url
             // })
             // window.location.href = 'https://' + window.location.host + '/sw-signal/navigate/' + resultUrl;
-            window.location.href = 'https://' + window.location.host + '/' + resultUrl;
+            nav.setAttribute('hidden', '')
+            debugger;
+            browser.contentDocument = data; //new DOMParser().parseFromString(data, 'text/html'); 
+            // browser.setAttribute('src', 'https://' + window.location.host + '/' + resultUrl);
+            browser.removeAttribute('hidden')
+            // window.location.href = 'https://' + window.location.host + '/' + resultUrl;
             // let newWindow = window.open('https://127.0.0.1:3000')
             // newWindow.document.write(response)
             // newWindow.document.scripts.

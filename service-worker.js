@@ -62,9 +62,9 @@ self.addEventListener("message", async function (event){
         if (event.data.type == 'FETCH_DOCUMENT'){
             // console.log(event.data.url)
             const originUrl = event.data.url
-            let resultUrl, status
+            let resultUrl, status, data
             try {
-                resultUrl = await prefetchDocument(originUrl);
+                [resultUrl, data] = await prefetchDocument(originUrl);
                 status = 'ok';
             } catch (error) {
                 // response = error
@@ -74,6 +74,7 @@ self.addEventListener("message", async function (event){
                 type : event.data.type,  
                 originUrl: originUrl,
                 resultUrl: resultUrl,
+                data: data,
                 status : status,
                 // response : response
             })
@@ -95,7 +96,7 @@ self.addEventListener("message", async function (event){
 })
 
 self.addEventListener('fetch', function (event) {
-    event.respondWith(requestHandler(event.request, event.clientId || event.resultingClientId));
+    event.respondWith(requestHandler(event));
 });
 
 // prefetch the document
@@ -110,7 +111,7 @@ async function prefetchDocument(target) {
             url = target.origin + target.pathname + url              
         }
     }
-    return url
+    return [url, await res.text()]
 }
 
 // convert ./<http|https>://<URI>
@@ -130,7 +131,7 @@ function get_target_URL(url) {
  * @param {String} url 
  * @returns 
  */
-async function parseHTML(htmlDocument) {
+async function oldparseHTML(htmlDocument) {
     // 3s load time old
     if (htmlDocument.length < 1) return null; // if the document is empty, return null
     // htmlDocument = htmlDocument.replace(/(?<=\<head.*\>)\s*(?=\<)/, injects.dom + injects.ws);
@@ -202,6 +203,11 @@ async function parseHTML(htmlDocument) {
     return result;
 }
 
+
+async function parseHTML(htmlDocument) {
+    let document = new DOMParser().parseFromString(htmlDocument, 'text/html');
+    console.log(document)
+}
 // performance: ~130ms pre call :(
 /**
  * 
@@ -292,14 +298,16 @@ async function signalHandler(request, reqUrl, clientID) {
 // response constructor
 /**
  * 
- * @param {Request} request 
+ * @param {Request} event 
  * @param {Request | URL} fetchDes 
  * @param {*} fetchInit 
  * @returns 
  */
 // async function fetchRespond(request, clientID, fetchDes, fetchInit = undefined) {
-async function fetchRespond(request, fetchDes, fetchInit = undefined) {
+async function fetchRespond(event, fetchDes, fetchInit = undefined) {
     
+    const clientID = event.clientId || event.resultingClientId
+
     const response = await fetch(fetchDes, fetchInit); 
     if (!response.ok || response.status == 0 ) return response;
 
@@ -316,13 +324,29 @@ async function fetchRespond(request, fetchDes, fetchInit = undefined) {
     const contentType = response.headers.get('content-type');
     if (contentType && typeof contentType == 'string') {
         if (contentType.includes('/javascript')) {
-            return new Response(await parseJS(await response.text(), request.url), {
+
+
+            const client = await self.clients.get(clientID);
+
+            console.log("service worker: postMessage");
+            client.postMessage({
+                type: 'SCRIPT_LOAD',
+                file: event.request.url,
+                code: await response.text()
+            });
+
+            return new Response('exec(scriptCache[`' + event.request.url + '`]); console.log("executed: " + `'+ event.request.url +'`);', {
                 status: response.status,
                 statusText: response.statusText,
                 headers: new Headers(response.headers),
             });
+            // return new Response(await parseJS(await response.text(), event.request.url), {
+            //     status: response.status,
+            //     statusText: response.statusText,
+            //     headers: new Headers(response.headers),
+            // });
         } else if (contentType.includes('text/html')) {
-            return new Response(await parseHTML(await response.text()), {
+            return new Response(await oldparseHTML(await response.text()), {
                 status: response.status,
                 statusText: response.statusText,
                 headers: new Headers(response.headers),
@@ -338,9 +362,11 @@ async function fetchRespond(request, fetchDes, fetchInit = undefined) {
  * @param {Request} request 
  * @returns 
  */
-async function requestHandler(request, clientID) {
+async function requestHandler(event) {
     // console.log(clientID, frames[clientID] ? frames[clientID] : 'frame with id: ' + clientID + ' not found');
 
+    const clientID = event.clientId || event.resultingClientId
+    let request = event.request;
     let requestURL = new URL(request.url); 
 
     for (let i = 0; i < localResource.length; i++) {
@@ -352,16 +378,16 @@ async function requestHandler(request, clientID) {
     if (request.destination == 'navigate') {
         let targetURL = new URL(requestURL.pathname.slice(1));
         console.log('navigate request: ' + targetURL.href);
-        return await fetchRespond(request, targetURL, await reqInit(request));
+        return await fetchRespond(event, targetURL, await reqInit(request));
     }else{
 
         // CROS requests
         if (requestURL.origin != CROS_SERVER_ENDPOINT.origin) {
             console.log('CROS REQUEST');
-            return await fetchRespond(request, CROS_SERVER_ENDPOINT + requestURL, await reqInit(request));
+            return await fetchRespond(event, CROS_SERVER_ENDPOINT + requestURL, await reqInit(request));
         }
         if (requestURL.pathname.startsWith('/http')) {
-            return await fetchRespond(request, requestURL, await reqInit(request));
+            return await fetchRespond(event, requestURL, await reqInit(request));
         }
         // direct requests to home server
         const clientURL = new URL((await self.clients.get(clientID)).url).pathname.slice(1);
@@ -369,7 +395,7 @@ async function requestHandler(request, clientID) {
             console.warn('client with id: ' + clientID + ' not found');
         }
         const target = new URL(requestURL.pathname, clientURL);
-        return await fetchRespond(request, CROS_SERVER_ENDPOINT + target, await reqInit(request));
+        return await fetchRespond(event, CROS_SERVER_ENDPOINT + target, await reqInit(request));
 
     }
 }

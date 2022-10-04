@@ -6,9 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
 </head>
-<body>
-    <button onclick="doCORSRequest();">Load WebPage</button>
-    <input type="url" id="Url" size="100">
+<body style="margin: 0px; display: flex;">
+    <div id="nav">
+        <button onclick="doCORSRequest();">Load WebPage</button>
+        <input type="url" id="Url" size="100">
+    </div>
+    <iframe id="browser" style="width: 100%; height: 100vh; border: 0px;" hidden></iframe>
+
     <script src="/index.js"></script>
+
 </body>
 </html>

@@ -110,22 +110,122 @@ class __CORS_location_base extends URL { // base location class
     }
 }
 
+Location = __CORS_location_base;
 const __CORS_location = new __CORS_location_base();
-// const __CORS_location = location;
-// let win = window;
-let win = {
-    get location() { return __CORS_location; },
-    set location(value) { __CORS_location.assign(value) },
+// // const __CORS_location = location;
+// // let win = window;
+// let win = {
+//     get location() { return __CORS_location; },
+//     set location(value) { __CORS_location.assign(value) },
+// }
+
+window.history.go = function (delta) {
+    console.log('history.go', delta);
 }
 
+/**
+ *  so besicially what's happening here is that we override a bunch of stuff that we want to change 
+ *  and execute the code in a controlled scope with eval
+ *  the exec function is contantly being redefined in a lower scope (nesting shouldn't really be a problem since 
+ *  no body would actually load like 1000 scripts)
+ */
 
+
+//execEnvGet = function (name) {return eval(name)};eval(code + evalCode);
+
+//execEnvGet = function (name) { try { return eval(name) } catch (e) { return undefined }}; execEnvSet = function (name, value) { return eval(name + " = " + "value;") };
+let exec;
+let evalCode = `
+
+exec = (code) => {execEnvGet = function (name) { try { return eval(name) } catch (e) { return undefined }}; execEnvSet = function (name, value) { return eval(name + " = " + "value;") };if(location != loc){loc.assign(location);}}`;
+
+// let base = new URL(window.location.pathname.slice(1) + window.location.search + window.location.hash);
+let base = new URL('https://test.com')
+let loc = new __CORS_location_base();
+
+class envResolve {
+    constructor(key) {
+        this.k = key
+    }
+}
+
+let execEnvGet = (name) => {return undefined}
+let execEnvSet = (name, value) => {return undefined}
+const handler = {
+    get(self, key) {
+        switch (key) {
+            case 'location':
+                return loc;
+                break;
+            default:
+                let returnVal = self[key];
+                if (returnVal instanceof envResolve || !returnVal) {
+                    returnVal = execEnvGet(key);
+                    self[key] = new envResolve(key)
+                }
+                if (typeof returnVal == 'function') {
+                    returnVal = returnVal.bind(self)
+                    // try {
+                    //     returnVal()
+                    // } catch (error) {
+                    //     if (error.message.indexOf('Illegal invocation' != -1)) {
+                    //         returnVal = returnVal.bind(self)
+                    //     }
+                    // }
+                }
+                return returnVal
+                break;
+        }
+    },
+    set(self, key, value) {
+        switch (key) {
+            case 'location':
+                return loc.assign(value);
+                break;
+            default:
+                if (self[key] instanceof envResolve) return execEnvSet(key, value);
+                return self[key] = value;
+                break;
+        }
+    }
+};
+
+// check location after script executation
+// check location in event listeners
+
+let timers = {};
+let current_exec_file = '';
+
+(() => {
+    let _doc = new Proxy(document, handler);
+    window.document = _doc;
+    let _win = new Proxy(window, handler);
+    (function (window, globalThis, document, location) {
+        timers.location = setInterval(() => {
+            if (location != loc) {
+                console.log('location changed', location, loc);
+                loc.assign(location);
+            }
+        }, 100)
+        exec = (code) => {
+            execEnvGet = function (name) { try { return eval(name) } catch (e) { return undefined }}
+            execEnvSet = function (name, value) {return eval(name + ' = ' + 'value;')}
+            eval(code + evalCode);
+            if (location != loc) {
+                loc.assign(location);
+            }
+        }
+    }).call(_win, _win, _win, _doc, loc);
+})()
+
+const scriptCache = {}
 // service worker callbacks
 sw.onmessage = (event) => {
     let data = event.data;
-    if (data.type == 'REPORT_ORIGIN') {
-        sw.controller.postMessage({
-            type: 'REPORT_ORIGIN',
-            origin: __CROS_origin
-        });
+    if (data.type == 'SCRIPT_LOAD') {
+        scriptCache[data.file] = data.code
+
+        // current_exec_file = data.file;
+        // exec(data.code);
     }
 }
