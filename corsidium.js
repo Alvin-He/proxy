@@ -139,7 +139,7 @@ function proxyRequest(targetURL, clientReq, clientRes) {
         hostname: targetURL.hostname,
         protocol: targetURL.protocol || 'http:',
         // default port based on protocols(http:80 https:443)
-        port: targetURL.port || targetURL.protocol == 'http:' ? 80 : 443,
+        port: targetURL.port || (targetURL.protocol == 'http:' ? 80 : 443),
         path: (targetURL.pathname || '/') + (targetURL.search || ''),
         method: clientReq.method,
         headers: {}
@@ -348,7 +348,7 @@ function upgradeListener(req, clientSocket, head) {
             const target = new URL(req.url.substring(4));
             const origin = new URL(target.searchParams.get('__CROS_LCPP_WS_ORIGIN')).origin;  
             target.searchParams.delete('__CROS_LCPP_WS_ORIGIN')
-            const port = target.port || target.protocol == 'wss:' ? 443 : 80;
+            const port = target.port || (target.protocol == 'wss:' ? 443 : 80);
             
             const proxySocket = tls.connect({
                 isServer: false,
